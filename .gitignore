@@ -47,6 +47,7 @@ data/*.db-wal
 
 # Superpowers brainstorm files
 .superpowers/
+docs/superpowers/
 
 # OpenNext build output
 .open-next/
