@@ -24,3 +24,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.area-map-pin {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  line-height: 20px;
+  text-align: center;
+}
