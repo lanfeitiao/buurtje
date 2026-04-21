@@ -40,10 +40,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# SQLite database
-data/*.db
-data/*.db-journal
-data/*.db-wal
+# Data
+data/
+
+# Tests
+__tests__/
+
+# Public assets
+public/
+
+# Scripts
+scripts/
 
 # Superpowers brainstorm files
 .superpowers/
