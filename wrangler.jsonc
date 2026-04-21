@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "postcode-explorer",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat", "expose_global_message_channel"],
+  "account_id": "c9391b8e7128a1ef39b8122621161bac",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "postcode-explorer",
+      "database_id": "8662421a-0597-4e4c-b3da-fe58ee2db129"
+    }
+  ]
+}
