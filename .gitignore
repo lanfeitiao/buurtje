@@ -40,17 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Data
+# Data (local DBs and generated mappings)
 data/
-
-# Tests
-__tests__/
-
-# Public assets
-public/
-
-# Scripts
-scripts/
 
 # Superpowers brainstorm files
 .superpowers/
