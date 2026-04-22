@@ -192,9 +192,15 @@ export default function AreaMap({ context }: AreaMapProps) {
             iconSize: [24, 24],
             iconAnchor: [12, 12],
           });
+          const name =
+            el.tags?.name ??
+            el.tags?.["name:nl"] ??
+            el.tags?.official_name ??
+            el.tags?.operator ??
+            fallback;
           L.marker([lat, lon], { icon })
             .addTo(map)
-            .bindPopup(el.tags?.name ?? fallback);
+            .bindPopup(name);
         }
       } catch {
         // Overpass is best-effort; ignore failures
