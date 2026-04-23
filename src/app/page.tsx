@@ -8,7 +8,7 @@ import Amenities from "@/components/Amenities";
 import Migration from "@/components/Migration";
 import HousingTypes from "@/components/HousingTypes";
 import ElectionResults from "@/components/ElectionResults";
-import PostcodeMap from "@/components/PostcodeMap";
+import AreaMap from "@/components/AreaMap";
 
 const PDOK_BASE = "https://api.pdok.nl/bzk/locatieserver/search/v3_1";
 
@@ -58,7 +58,12 @@ type SearchResult =
       code: string;
       areaCode: string;
       label: string;
+      geometrieWkt: string;
     };
+
+type MapContext =
+  | { kind: "postcode"; code: string }
+  | { kind: "buurt" | "wijk"; geometrieWkt: string; label: string };
 
 async function resolveQuery(query: string): Promise<SearchResult> {
   if (/^\d{4}$/.test(query)) {
@@ -69,7 +74,7 @@ async function resolveQuery(query: string): Promise<SearchResult> {
   const buurtDoc = await pdokSearch(
     query,
     "type:buurt OR type:wijk",
-    "weergavenaam,centroide_ll,buurtnaam,wijknaam,gemeentenaam,type,buurtcode,wijkcode"
+    "weergavenaam,centroide_ll,geometrie_ll,buurtnaam,wijknaam,gemeentenaam,type,buurtcode,wijkcode"
   );
   if (buurtDoc?.centroide_ll && buurtDoc?.gemeentenaam) {
     const coords = parseCoords(buurtDoc.centroide_ll);
@@ -88,6 +93,7 @@ async function resolveQuery(query: string): Promise<SearchResult> {
         code,
         areaCode: areaCode || "",
         label: buurtDoc.weergavenaam,
+        geometrieWkt: buurtDoc.geometrie_ll ?? "",
       };
     }
   }
@@ -127,6 +133,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [matchedLabel, setMatchedLabel] = useState<string | null>(null);
   const [areaType, setAreaType] = useState<string | null>(null);
+  const [mapContext, setMapContext] = useState<MapContext | null>(null);
 
   async function handleSearch(query: string) {
     setIsLoading(true);
@@ -134,6 +141,7 @@ export default function Home() {
     setData(null);
     setMatchedLabel(null);
     setAreaType(null);
+    setMapContext(null);
 
     try {
       const result = await resolveQuery(query);
@@ -141,6 +149,11 @@ export default function Home() {
       if (result.kind === "area") {
         setMatchedLabel(result.label);
         setAreaType(result.areaType);
+        setMapContext({
+          kind: result.areaType,
+          geometrieWkt: result.geometrieWkt,
+          label: result.label,
+        });
         // Fetch buurt/wijk-specific data
         const params = new URLSearchParams({
           code: result.code,
@@ -158,6 +171,7 @@ export default function Home() {
         // show postcode-level data instead
         if (result.code !== "0000") {
           setAreaType(null);
+          setMapContext({ kind: "postcode", code: result.code });
           const fallback = await fetch(`/api/postcode/${result.code}`);
           if (fallback.ok) {
             const json: PostcodeData = await fallback.json();
@@ -169,6 +183,7 @@ export default function Home() {
         setError(`No data found for ${result.label}.`);
       } else {
         if (result.label) setMatchedLabel(result.label);
+        setMapContext({ kind: "postcode", code: result.code });
         const res = await fetch(`/api/postcode/${result.code}`);
         if (!res.ok) {
           setError(`No data found for postcode ${result.code}.`);
@@ -189,7 +204,7 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6">
         <div className="mb-4 flex items-center gap-2">
           <span
@@ -234,13 +249,19 @@ export default function Home() {
       )}
 
       {data && !isLoading && (
-        <div className="space-y-4">
-          <PostcodeMap postcode={data.code} />
-          <QuickStats data={data} />
-          <Amenities data={data} />
-          <Migration data={data} />
-          <HousingTypes data={data} />
-          <ElectionResults data={data} />
+        <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+          <div className="space-y-4">
+            <QuickStats data={data} />
+            <Amenities data={data} />
+            <Migration data={data} />
+            <HousingTypes data={data} />
+            <ElectionResults data={data} />
+          </div>
+          {mapContext && (
+            <div className="lg:sticky lg:top-4 lg:self-start">
+              <AreaMap context={mapContext} />
+            </div>
+          )}
         </div>
       )}
     </main>
