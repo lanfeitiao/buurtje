@@ -55,3 +55,6 @@ docs/superpowers/
 
 # Generated election SQL (large)
 election-data.sql
+
+# Generated schools SQL (regenerated from DUO CSV via generate-schools-sql)
+schools.sql

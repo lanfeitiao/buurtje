@@ -77,3 +77,31 @@ export async function getAreaElectionData(
     totalVotes,
   };
 }
+
+export type SchoolRow = {
+  brin: string;
+  name: string;
+  street: string | null;
+  huisnummer: string | null;
+  postcode: string;
+  city: string | null;
+  denominatie: string | null;
+  lat: number;
+  lon: number;
+};
+
+export async function getSchoolsInBbox(
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+  limit = 500
+): Promise<SchoolRow[]> {
+  const rows = await getDb()
+    .prepare(
+      "SELECT brin, name, street, huisnummer, postcode, city, denominatie, lat, lon FROM schools WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT ?"
+    )
+    .bind(south, north, west, east, limit)
+    .all<SchoolRow>();
+  return rows.results ?? [];
+}
