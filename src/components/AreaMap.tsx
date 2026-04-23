@@ -148,7 +148,7 @@ export default function AreaMap({ context }: AreaMapProps) {
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
         {
           attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> | Boundaries: &copy; CBS, &copy; ESRI Nederland',
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> | Boundaries: &copy; CBS, &copy; ESRI Nederland | Schools: &copy; <a href="https://duo.nl/open_onderwijsdata/">DUO</a> (CC-BY 4.0)',
           subdomains: "abcd",
           maxZoom: 19,
         }
@@ -168,9 +168,56 @@ export default function AreaMap({ context }: AreaMapProps) {
       const bounds = layer.getBounds();
       map.fitBounds(bounds, { padding: [30, 30] });
 
+      const schoolIcon = L.divIcon({
+        className: "area-map-pin area-map-pin--school",
+        html: "🏫",
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+      const shopIcon = L.divIcon({
+        className: "area-map-pin area-map-pin--shop",
+        html: "🛒",
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+
+      const south = bounds.getSouth();
+      const west = bounds.getWest();
+      const north = bounds.getNorth();
+      const east = bounds.getEast();
+
+      // Schools: authoritative DUO data via our API
       try {
-        const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
-        const q = `[out:json][timeout:15];(node["amenity"="school"](${bbox});node["shop"="supermarket"](${bbox});way["amenity"="school"](${bbox});way["shop"="supermarket"](${bbox}););out center tags;`;
+        const bboxParam = `${south},${west},${north},${east}`;
+        const res = await fetch(`/api/schools?bbox=${bboxParam}`);
+        if (!cancelled && res.ok) {
+          const { schools } = (await res.json()) as {
+            schools: {
+              name: string;
+              lat: number;
+              lon: number;
+              denominatie?: string | null;
+            }[];
+          };
+          if (!cancelled) {
+            for (const s of schools) {
+              const popup = s.denominatie
+                ? `<strong>${s.name}</strong><br/><span style="color:#666">${s.denominatie}</span>`
+                : `<strong>${s.name}</strong>`;
+              L.marker([s.lat, s.lon], { icon: schoolIcon })
+                .addTo(map)
+                .bindPopup(popup);
+            }
+          }
+        }
+      } catch {
+        // Schools fetch is best-effort
+      }
+
+      // Supermarkets: Overpass (no authoritative Dutch dataset bundled)
+      try {
+        const bboxOp = `${south},${west},${north},${east}`;
+        const q = `[out:json][timeout:15];(node["shop"="supermarket"](${bboxOp});way["shop"="supermarket"](${bboxOp}););out center tags;`;
         const res = await fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
           body: new URLSearchParams({ data: q }),
@@ -183,22 +230,13 @@ export default function AreaMap({ context }: AreaMapProps) {
           const lat = el.lat ?? el.center?.lat;
           const lon = el.lon ?? el.center?.lon;
           if (lat == null || lon == null) continue;
-          const isSchool = el.tags?.amenity === "school";
-          const emoji = isSchool ? "🏫" : "🛒";
-          const fallback = isSchool ? "School" : "Supermarket";
-          const icon = L.divIcon({
-            className: `area-map-pin area-map-pin--${isSchool ? "school" : "shop"}`,
-            html: emoji,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-          });
           const name =
             el.tags?.name ??
             el.tags?.["name:nl"] ??
-            el.tags?.official_name ??
+            el.tags?.brand ??
             el.tags?.operator ??
-            fallback;
-          L.marker([lat, lon], { icon })
+            "Supermarket";
+          L.marker([lat, lon], { icon: shopIcon })
             .addTo(map)
             .bindPopup(name);
         }

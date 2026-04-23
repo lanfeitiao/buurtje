@@ -9,8 +9,9 @@
     "lint": "eslint",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "seed-local": "npx wrangler d1 execute postcode-explorer --local --file=schema.sql && npx wrangler d1 execute postcode-explorer --local --file=election-data.sql",
-    "seed-remote": "npx wrangler d1 execute postcode-explorer --remote --file=schema.sql && npx wrangler d1 execute postcode-explorer --remote --file=election-data.sql"
+    "seed-local": "npx wrangler d1 execute postcode-explorer --local --file=schema.sql && npx wrangler d1 execute postcode-explorer --local --file=election-data.sql && npx wrangler d1 execute postcode-explorer --local --file=schools.sql",
+    "seed-remote": "npx wrangler d1 execute postcode-explorer --remote --file=schema.sql && npx wrangler d1 execute postcode-explorer --remote --file=election-data.sql && npx wrangler d1 execute postcode-explorer --remote --file=schools.sql",
+    "generate-schools-sql": "npx tsx scripts/import-duo-schools.ts"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.19.1",
