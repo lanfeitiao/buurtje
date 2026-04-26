@@ -47,6 +47,9 @@ data/
 .superpowers/
 docs/superpowers/
 
+# Git worktrees
+.worktrees/
+
 # OpenNext build output
 .open-next/
 
