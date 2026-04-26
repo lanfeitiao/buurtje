@@ -109,4 +109,18 @@ describe("history", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].query).toBe("good");
   });
+
+  test("APIs degrade silently when localStorage is unavailable", () => {
+    uninstallLocalStorage();
+
+    expect(() =>
+      addToHistory({ query: "Amsterdam", label: "L", kind: "buurt", timestamp: 1 })
+    ).not.toThrow();
+    expect(() => removeFromHistory("Amsterdam")).not.toThrow();
+    expect(() => clearHistory()).not.toThrow();
+    expect(readHistory()).toEqual([]);
+
+    // restore for any later tests in this file
+    installLocalStorage();
+  });
 });
