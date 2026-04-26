@@ -23,10 +23,15 @@ export function readHistory(): HistoryEntry[] {
   }
 }
 
+function normalize(query: string): string {
+  return query.trim().toLowerCase();
+}
+
 export function addToHistory(entry: HistoryEntry): void {
   if (!hasStorage()) return;
   try {
-    const current = readHistory();
+    const norm = normalize(entry.query);
+    const current = readHistory().filter((e) => normalize(e.query) !== norm);
     const next = [entry, ...current];
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {

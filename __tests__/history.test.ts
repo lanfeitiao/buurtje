@@ -46,4 +46,14 @@ describe("history", () => {
   test("readHistory returns [] when nothing has been written", () => {
     expect(readHistory()).toEqual([]);
   });
+
+  test("addToHistory dedupes by normalized query and refreshes timestamp", () => {
+    addToHistory({ query: "Amsterdam", label: "Amsterdam (old)", kind: "buurt", timestamp: 1000 });
+    addToHistory({ query: "  amsterdam  ", label: "Amsterdam (new)", kind: "buurt", timestamp: 2000 });
+
+    const entries = readHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].label).toBe("Amsterdam (new)");
+    expect(entries[0].timestamp).toBe(2000);
+  });
 });
