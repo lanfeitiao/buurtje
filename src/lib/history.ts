@@ -53,6 +53,7 @@ export function addToHistory(entry: HistoryEntry): void {
     }
 
     localStorage.setItem(KEY, JSON.stringify(next));
+    notifyChange();
   } catch {
     // silent
   }
@@ -64,6 +65,7 @@ export function removeFromHistory(query: string): void {
     const norm = normalize(query);
     const next = readHistory().filter((e) => normalize(e.query) !== norm);
     localStorage.setItem(KEY, JSON.stringify(next));
+    notifyChange();
   } catch {
     // silent
   }
@@ -73,6 +75,16 @@ export function clearHistory(): void {
   if (!hasStorage()) return;
   try {
     localStorage.removeItem(KEY);
+    notifyChange();
+  } catch {
+    // silent
+  }
+}
+
+function notifyChange(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent("buurtje:history-changed"));
   } catch {
     // silent
   }
