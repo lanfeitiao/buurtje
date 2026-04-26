@@ -14,11 +14,17 @@ async function resolveElection(
   // Prefer buurt/wijk-specific election data when available
   if (areaCode) {
     const areaElection = await getAreaElectionData(areaCode);
-    if (areaElection) return areaElection;
+    if (areaElection) return { ...areaElection, source: { kind: "area" as const } };
   }
   // Fall back to postcode-level data
   if (fallbackPostcode) {
-    return await getElectionData(fallbackPostcode);
+    const postcodeElection = await getElectionData(fallbackPostcode);
+    if (postcodeElection) {
+      return {
+        ...postcodeElection,
+        source: { kind: "postcode" as const, code: fallbackPostcode },
+      };
+    }
   }
   return null;
 }

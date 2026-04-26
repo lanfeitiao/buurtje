@@ -40,10 +40,25 @@ function shortName(party: string): string {
   return map[party] || party;
 }
 
+function captionFor(
+  source: { kind: "area" } | { kind: "postcode"; code: string },
+  dataCode: string
+): string {
+  if (source.kind === "area") {
+    return "Aggregated from polling stations in this area";
+  }
+  const isAreaSearch = dataCode.startsWith("buurt:") || dataCode.startsWith("wijk:");
+  const areaType = dataCode.startsWith("wijk:") ? "wijk" : "buurt";
+  if (isAreaSearch) {
+    return `No polling stations in this ${areaType} — showing data from postcode ${source.code}`;
+  }
+  return `Aggregated from polling stations in postcode ${source.code}`;
+}
+
 export default function ElectionResults({ data }: ElectionResultsProps) {
   if (!data.election) return null;
 
-  const { parties, totalVotes, year } = data.election;
+  const { parties, totalVotes, year, source } = data.election;
   const topParties = parties.slice(0, 8);
   const maxPct = topParties[0]?.percentage || 1;
 
@@ -56,7 +71,7 @@ export default function ElectionResults({ data }: ElectionResultsProps) {
         </span>
       </h3>
       <p className="text-[11px] text-gray-400 mb-4">
-        Aggregated from polling stations in this area
+        {captionFor(source, data.code)}
       </p>
       <div className="space-y-2">
         {topParties.map((party) => (

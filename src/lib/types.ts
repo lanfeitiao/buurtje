@@ -32,5 +32,6 @@ export interface PostcodeData {
       percentage: number;
     }>;
     totalVotes: number;
+    source: { kind: "area" } | { kind: "postcode"; code: string };
   };
 }

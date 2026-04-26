@@ -18,14 +18,24 @@ export async function GET(
   const cached = await getPostcodeData(code);
   if (cached) {
     const election = await getElectionData(code);
-    return NextResponse.json({ ...cached, election: election ?? undefined });
+    return NextResponse.json({
+      ...cached,
+      election: election
+        ? { ...election, source: { kind: "postcode", code } }
+        : undefined,
+    });
   }
 
   try {
     const data = await scrapePostcode(code);
     await setPostcodeData(code, data);
     const election = await getElectionData(code);
-    return NextResponse.json({ ...data, election: election ?? undefined });
+    return NextResponse.json({
+      ...data,
+      election: election
+        ? { ...election, source: { kind: "postcode", code } }
+        : undefined,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     if (message.includes("404")) {

@@ -28,9 +28,11 @@ export async function setPostcodeData(
     .run();
 }
 
+type ElectionWithoutSource = Omit<NonNullable<PostcodeData["election"]>, "source">;
+
 export async function getElectionData(
   code: string
-): Promise<PostcodeData["election"] | null> {
+): Promise<ElectionWithoutSource | null> {
   const rows = await getDb()
     .prepare(
       "SELECT party, votes FROM election_data WHERE postcode = ? ORDER BY votes DESC"
@@ -55,7 +57,7 @@ export async function getElectionData(
 
 export async function getAreaElectionData(
   areaCode: string
-): Promise<PostcodeData["election"] | null> {
+): Promise<ElectionWithoutSource | null> {
   const rows = await getDb()
     .prepare(
       "SELECT party, votes FROM area_election_data WHERE area_code = ? ORDER BY votes DESC"
