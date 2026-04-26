@@ -92,4 +92,21 @@ describe("history", () => {
 
     expect(readHistory()).toEqual([]);
   });
+
+  test("readHistory drops malformed entries without throwing", () => {
+    // Hand-write a corrupt blob: one valid entry, one missing fields, one wrong type
+    localStorage.setItem(
+      "buurtje:search-history",
+      JSON.stringify([
+        { query: "good", label: "Good", kind: "buurt", timestamp: 1 },
+        { query: "missing-fields" },
+        { query: 123, label: "wrong type", kind: "buurt", timestamp: 2 },
+        "not even an object",
+      ])
+    );
+
+    const entries = readHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].query).toBe("good");
+  });
 });

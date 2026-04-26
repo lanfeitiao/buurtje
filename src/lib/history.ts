@@ -11,6 +11,17 @@ function hasStorage(): boolean {
   }
 }
 
+function isHistoryEntry(value: unknown): value is HistoryEntry {
+  if (!value || typeof value !== "object") return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.query === "string" &&
+    typeof e.label === "string" &&
+    (e.kind === "postcode" || e.kind === "buurt" || e.kind === "wijk") &&
+    typeof e.timestamp === "number"
+  );
+}
+
 export function readHistory(): HistoryEntry[] {
   if (!hasStorage()) return [];
   try {
@@ -18,7 +29,7 @@ export function readHistory(): HistoryEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed as HistoryEntry[];
+    return parsed.filter(isHistoryEntry);
   } catch {
     return [];
   }
