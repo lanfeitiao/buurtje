@@ -83,4 +83,13 @@ describe("history", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].query).toBe("Rotterdam");
   });
+
+  test("clearHistory empties the list", () => {
+    addToHistory({ query: "Amsterdam", label: "L1", kind: "buurt", timestamp: 1 });
+    addToHistory({ query: "Rotterdam", label: "L2", kind: "buurt", timestamp: 2 });
+
+    clearHistory();
+
+    expect(readHistory()).toEqual([]);
+  });
 });

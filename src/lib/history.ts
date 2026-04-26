@@ -59,5 +59,10 @@ export function removeFromHistory(query: string): void {
 }
 
 export function clearHistory(): void {
-  // implemented in a later step
+  if (!hasStorage()) return;
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // silent
+  }
 }
