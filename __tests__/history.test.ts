@@ -56,4 +56,20 @@ describe("history", () => {
     expect(entries[0].label).toBe("Amsterdam (new)");
     expect(entries[0].timestamp).toBe(2000);
   });
+
+  test("addToHistory caps at 50 entries, dropping the oldest by timestamp", () => {
+    // pre-fill 50 entries with timestamps 1..50; query 1 is oldest
+    for (let i = 1; i <= 50; i++) {
+      addToHistory({ query: `q${i}`, label: `L${i}`, kind: "postcode", timestamp: i });
+    }
+
+    addToHistory({ query: "q51", label: "L51", kind: "postcode", timestamp: 51 });
+
+    const entries = readHistory();
+    expect(entries).toHaveLength(50);
+    // The entry with timestamp 1 should have been evicted
+    expect(entries.find((e) => e.timestamp === 1)).toBeUndefined();
+    // The new entry should be present
+    expect(entries.find((e) => e.query === "q51")?.timestamp).toBe(51);
+  });
 });

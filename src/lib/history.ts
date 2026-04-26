@@ -1,6 +1,7 @@
 import type { HistoryEntry } from "@/lib/types";
 
 const KEY = "buurtje:search-history";
+const MAX_ENTRIES = 50;
 
 function hasStorage(): boolean {
   try {
@@ -32,7 +33,14 @@ export function addToHistory(entry: HistoryEntry): void {
   try {
     const norm = normalize(entry.query);
     const current = readHistory().filter((e) => normalize(e.query) !== norm);
-    const next = [entry, ...current];
+    const merged = [entry, ...current];
+
+    let next = merged;
+    if (next.length > MAX_ENTRIES) {
+      // Drop the entries with the lowest timestamps until we're at the cap.
+      next = [...merged].sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_ENTRIES);
+    }
+
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     // silent
