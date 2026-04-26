@@ -24,6 +24,13 @@ export interface PostcodeData {
     ownership: { koop: number; huur: number };
     buildingType: Record<string, number>;
   };
+  householdComposition?: {
+    year: number;
+    total: number;
+    single: number;
+    withoutKids: number;
+    withKids: number;
+  };
   election?: {
     year: number;
     parties: Array<{

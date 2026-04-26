@@ -36,7 +36,15 @@ function formatNumber(n: number): string {
 }
 
 export default function QuickStats({ data }: QuickStatsProps) {
-  const { quickStats } = data;
+  const { quickStats, householdComposition } = data;
+
+  const sum = householdComposition
+    ? householdComposition.single +
+      householdComposition.withoutKids +
+      householdComposition.withKids
+    : 0;
+  const withKidsPct =
+    sum > 0 ? (householdComposition!.withKids / sum) * 100 : null;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -56,9 +64,9 @@ export default function QuickStats({ data }: QuickStatsProps) {
         year={quickStats.population.year}
       />
       <StatTile
-        label="Households"
-        value={formatNumber(quickStats.households.value)}
-        year={quickStats.households.year}
+        label="Families w/Kids"
+        value={withKidsPct !== null ? `${withKidsPct.toFixed(1)}%` : "—"}
+        year={householdComposition?.year ?? quickStats.households.year}
       />
     </div>
   );

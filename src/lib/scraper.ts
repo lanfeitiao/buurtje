@@ -102,6 +102,24 @@ export function parsePostcodePage(code: string, html: string): PostcodeData {
   const appartPct = findRowValue("% appartementen");
   const huisPct = findRowValue("% eengezinswoningen");
 
+  const singleHh = parseNumber(findRowValue("eenpersoonshuishoudens")) || 0;
+  const withoutKidsHh =
+    parseNumber(findRowValue("meerpersoonshuishoudens zonder kinderen")) || 0;
+  const withKidsHh =
+    parseNumber(findRowValue("meerpersoonshuishoudens met kinderen")) || 0;
+  const compYear = findRowYear("eenpersoonshuishoudens");
+  const totalHh = parseNumber(householdsText) || 0;
+  const householdComposition =
+    singleHh + withoutKidsHh + withKidsHh > 0
+      ? {
+          year: compYear || householdsYear || new Date().getFullYear(),
+          total: totalHh,
+          single: singleHh,
+          withoutKids: withoutKidsHh,
+          withKids: withKidsHh,
+        }
+      : undefined;
+
   return {
     code,
     location,
@@ -128,6 +146,7 @@ export function parsePostcodePage(code: string, html: string): PostcodeData {
       ownership: { koop: parsePercentage(koopPct), huur: parsePercentage(huurPct) },
       buildingType: { appartement: parsePercentage(appartPct), huis: parsePercentage(huisPct) },
     },
+    householdComposition,
   };
 }
 
