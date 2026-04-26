@@ -47,8 +47,15 @@ export function addToHistory(entry: HistoryEntry): void {
   }
 }
 
-export function removeFromHistory(_query: string): void {
-  // implemented in a later step
+export function removeFromHistory(query: string): void {
+  if (!hasStorage()) return;
+  try {
+    const norm = normalize(query);
+    const next = readHistory().filter((e) => normalize(e.query) !== norm);
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // silent
+  }
 }
 
 export function clearHistory(): void {

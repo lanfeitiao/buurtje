@@ -72,4 +72,15 @@ describe("history", () => {
     // The new entry should be present
     expect(entries.find((e) => e.query === "q51")?.timestamp).toBe(51);
   });
+
+  test("removeFromHistory removes the matching entry by normalized query", () => {
+    addToHistory({ query: "Amsterdam", label: "L1", kind: "buurt", timestamp: 1 });
+    addToHistory({ query: "Rotterdam", label: "L2", kind: "buurt", timestamp: 2 });
+
+    removeFromHistory("AMSTERDAM");
+
+    const entries = readHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].query).toBe("Rotterdam");
+  });
 });
