@@ -16,6 +16,9 @@ export function useHistory(): {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
+    // localStorage is unavailable during SSR — bootstrap the client-side
+    // snapshot inside the effect rather than during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries(readHistory());
 
     function refresh() {
