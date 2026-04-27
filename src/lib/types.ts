@@ -56,3 +56,13 @@ export type CompareEntry = {
   kind: "postcode" | "buurt" | "wijk";
   addedAt: number;
 };
+
+// Per-buurt input shared by all `/compare` chart components.
+// Each chart receives its data column already paired with a stable
+// palette colour and the resolved PostcodeData (or null when fetching
+// failed for that column).
+export interface CompareDataColumn {
+  entry: CompareEntry;
+  color: string;
+  data: PostcodeData | null;
+}

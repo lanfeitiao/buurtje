@@ -1,15 +1,9 @@
 "use client";
 
-import type { PostcodeData, CompareEntry } from "@/lib/types";
-
-export interface ElectionColumn {
-  entry: CompareEntry;
-  color: string;
-  data: PostcodeData | null;
-}
+import type { CompareDataColumn } from "@/lib/types";
 
 interface CompareElectionChartProps {
-  columns: ElectionColumn[];
+  columns: CompareDataColumn[];
 }
 
 const TOP_N = 5;

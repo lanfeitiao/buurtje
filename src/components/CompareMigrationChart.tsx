@@ -1,15 +1,9 @@
 "use client";
 
-import type { PostcodeData, CompareEntry } from "@/lib/types";
-
-export interface MigrationColumn {
-  entry: CompareEntry;
-  color: string;
-  data: PostcodeData | null;
-}
+import type { CompareDataColumn } from "@/lib/types";
 
 interface CompareMigrationChartProps {
-  columns: MigrationColumn[];
+  columns: CompareDataColumn[];
 }
 
 const ORIGIN_COLORS = ["#E65100", "#FF8A65", "#FFCCBC"];

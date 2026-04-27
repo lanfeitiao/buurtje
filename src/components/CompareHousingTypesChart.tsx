@@ -1,15 +1,9 @@
 "use client";
 
-import type { PostcodeData, CompareEntry } from "@/lib/types";
-
-export interface HousingTypeColumn {
-  entry: CompareEntry;
-  color: string;
-  data: PostcodeData | null;
-}
+import type { CompareDataColumn } from "@/lib/types";
 
 interface CompareHousingTypesChartProps {
-  columns: HousingTypeColumn[];
+  columns: CompareDataColumn[];
 }
 
 const BUILDING_COLORS = ["#E65100", "#FF8A65", "#FFCCBC", "#BF360C", "#FF7043"];
