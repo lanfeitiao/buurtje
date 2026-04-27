@@ -42,3 +42,10 @@ export interface PostcodeData {
     source: { kind: "area" } | { kind: "postcode"; code: string };
   };
 }
+
+export type HistoryEntry = {
+  query: string;
+  label: string;
+  kind: "postcode" | "buurt" | "wijk";
+  timestamp: number;
+};

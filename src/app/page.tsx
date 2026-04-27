@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { PostcodeData } from "@/lib/types";
+import { Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { PostcodeData, HistoryEntry } from "@/lib/types";
+import { addToHistory } from "@/lib/history";
 import PostcodeSearch from "@/components/PostcodeSearch";
 import QuickStats from "@/components/QuickStats";
 import Amenities from "@/components/Amenities";
@@ -127,13 +130,15 @@ async function resolveQuery(query: string): Promise<SearchResult> {
   throw new Error("Address not found");
 }
 
-export default function Home() {
+function HomeContent() {
   const [data, setData] = useState<PostcodeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matchedLabel, setMatchedLabel] = useState<string | null>(null);
   const [areaType, setAreaType] = useState<string | null>(null);
   const [mapContext, setMapContext] = useState<MapContext | null>(null);
+  const searchParams = useSearchParams();
+  const autoSearchedRef = useRef(false);
 
   async function handleSearch(query: string) {
     setIsLoading(true);
@@ -165,6 +170,13 @@ export default function Home() {
         if (res.ok) {
           const json: PostcodeData = await res.json();
           setData(json);
+          const entry: HistoryEntry = {
+            query,
+            label: result.label,
+            kind: result.areaType,
+            timestamp: Date.now(),
+          };
+          addToHistory(entry);
           return;
         }
         // Fallback: buurt/wijk page not found on allecijfers.nl —
@@ -177,6 +189,15 @@ export default function Home() {
             const json: PostcodeData = await fallback.json();
             setData(json);
             setMatchedLabel(`${result.label} (showing postcode ${result.code})`);
+            // Save the original area entry, not the postcode fallback —
+            // history should reflect what the user searched for.
+            const entry: HistoryEntry = {
+              query,
+              label: result.label,
+              kind: result.areaType,
+              timestamp: Date.now(),
+            };
+            addToHistory(entry);
             return;
           }
         }
@@ -191,6 +212,13 @@ export default function Home() {
         }
         const json: PostcodeData = await res.json();
         setData(json);
+        const entry: HistoryEntry = {
+          query,
+          label: result.label ?? result.code,
+          kind: "postcode",
+          timestamp: Date.now(),
+        };
+        addToHistory(entry);
       }
     } catch (err) {
       if (err instanceof Error && err.message === "Address not found") {
@@ -203,17 +231,35 @@ export default function Home() {
     }
   }
 
+  useEffect(() => {
+    if (autoSearchedRef.current) return;
+    const q = searchParams.get("q");
+    if (q && q.trim().length >= 2) {
+      autoSearchedRef.current = true;
+      handleSearch(q.trim());
+    }
+  }, [searchParams]);
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <span
-            className="h-3 w-3 rounded-full"
-            style={{ backgroundColor: "#E65100" }}
-          />
-          <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
-            Buurtje
-          </span>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: "#E65100" }}
+            />
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              Buurtje
+            </span>
+          </div>
+          <Link
+            href="/history"
+            className="text-sm font-semibold"
+            style={{ color: "#E65100" }}
+          >
+            History
+          </Link>
         </div>
         <PostcodeSearch onSearch={handleSearch} isLoading={isLoading} />
         {data && !isLoading && (
@@ -265,5 +311,13 @@ export default function Home() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }
