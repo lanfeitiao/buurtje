@@ -57,6 +57,7 @@ export function addToCompareSet(entry: CompareEntry): void {
     }
 
     localStorage.setItem(KEY, JSON.stringify(next));
+    notifyChange();
   } catch {
     // silent
   }
@@ -68,6 +69,7 @@ export function removeFromCompareSet(query: string): void {
     const norm = normalize(query);
     const next = readCompareSet().filter((e) => normalize(e.query) !== norm);
     localStorage.setItem(KEY, JSON.stringify(next));
+    notifyChange();
   } catch {
     // silent
   }
@@ -77,6 +79,7 @@ export function clearCompareSet(): void {
   if (!hasStorage()) return;
   try {
     localStorage.removeItem(KEY);
+    notifyChange();
   } catch {
     // silent
   }
@@ -85,4 +88,13 @@ export function clearCompareSet(): void {
 export function isInCompareSet(query: string): boolean {
   const norm = normalize(query);
   return readCompareSet().some((e) => normalize(e.query) === norm);
+}
+
+function notifyChange(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent("buurtje:compare-changed"));
+  } catch {
+    // silent
+  }
 }
