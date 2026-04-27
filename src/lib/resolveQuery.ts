@@ -37,8 +37,15 @@ function toSlug(name: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+export type AddressPoint = { lat: number; lon: number; label: string };
+
 export type SearchResult =
-  | { kind: "postcode"; code: string; label?: string }
+  | {
+      kind: "postcode";
+      code: string;
+      label?: string;
+      addressPoint?: AddressPoint;
+    }
   | {
       kind: "area";
       areaType: "buurt" | "wijk";
@@ -47,12 +54,18 @@ export type SearchResult =
       areaCode: string;
       label: string;
       buurtName?: string;          // populated only on the address path
+      addressPoint?: AddressPoint; // populated only on the address path
       geometrieWkt: string;
     };
 
 export type MapContext =
-  | { kind: "postcode"; code: string }
-  | { kind: "buurt" | "wijk"; geometrieWkt: string; label: string };
+  | { kind: "postcode"; code: string; addressPoint?: AddressPoint }
+  | {
+      kind: "buurt" | "wijk";
+      geometrieWkt: string;
+      label: string;
+      addressPoint?: AddressPoint;
+    };
 
 export async function resolveQuery(query: string): Promise<SearchResult> {
   if (/^\d{4}$/.test(query)) {
@@ -82,8 +95,15 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
     const adresDoc = await pdokSearch(
       query,
       "type:adres",
-      "postcode,weergavenaam,buurtcode,buurtnaam,wijkcode,wijknaam,gemeentenaam"
+      "postcode,weergavenaam,buurtcode,buurtnaam,wijkcode,wijknaam,gemeentenaam,centroide_ll"
     );
+    const point = adresDoc?.centroide_ll
+      ? parseCoords(adresDoc.centroide_ll)
+      : null;
+    const addressPoint: AddressPoint | undefined =
+      point && adresDoc?.weergavenaam
+        ? { lat: point.lat, lon: point.lon, label: adresDoc.weergavenaam }
+        : undefined;
     if (
       adresDoc?.buurtcode &&
       adresDoc?.buurtnaam &&
@@ -106,6 +126,7 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
         areaCode: adresDoc.buurtcode,
         label: adresDoc.weergavenaam,
         buurtName: adresDoc.buurtnaam,
+        addressPoint,
         geometrieWkt: buurtDoc?.geometrie_ll ?? "",
       };
     }
@@ -114,6 +135,7 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
         kind: "postcode",
         code: adresDoc.postcode.substring(0, 4),
         label: adresDoc.weergavenaam,
+        addressPoint,
       };
     }
     return null;

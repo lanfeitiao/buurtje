@@ -49,6 +49,7 @@ function HomeContent() {
           kind: result.areaType,
           geometrieWkt: result.geometrieWkt,
           label: result.label,
+          addressPoint: result.addressPoint,
         });
         // Fetch buurt/wijk-specific data
         const params = new URLSearchParams({
@@ -75,7 +76,11 @@ function HomeContent() {
         if (result.code !== "0000") {
           setAreaType(null);
           setBuurtName(null);
-          setMapContext({ kind: "postcode", code: result.code });
+          setMapContext({
+            kind: "postcode",
+            code: result.code,
+            addressPoint: result.addressPoint,
+          });
           const fallback = await fetch(`/api/postcode/${result.code}`);
           if (fallback.ok) {
             const json: PostcodeData = await fallback.json();
@@ -96,7 +101,11 @@ function HomeContent() {
         setError(`No data found for ${result.label}.`);
       } else {
         if (result.label) setMatchedLabel(result.label);
-        setMapContext({ kind: "postcode", code: result.code });
+        setMapContext({
+          kind: "postcode",
+          code: result.code,
+          addressPoint: result.addressPoint,
+        });
         const res = await fetch(`/api/postcode/${result.code}`);
         if (!res.ok) {
           setError(`No data found for postcode ${result.code}.`);

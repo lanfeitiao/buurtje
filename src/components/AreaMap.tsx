@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 
+type AddressPoint = { lat: number; lon: number; label: string };
+
 export type AreaMapContext =
-  | { kind: "postcode"; code: string }
-  | { kind: "buurt" | "wijk"; geometrieWkt: string; label: string };
+  | { kind: "postcode"; code: string; addressPoint?: AddressPoint }
+  | { kind: "buurt" | "wijk"; geometrieWkt: string; label: string;
+      addressPoint?: AddressPoint };
 
 interface AreaMapProps {
   context: AreaMapContext;
@@ -85,8 +88,8 @@ export default function AreaMap({ context }: AreaMapProps) {
 
   const ctxKey =
     context.kind === "postcode"
-      ? `postcode:${context.code}`
-      : `${context.kind}:${context.geometrieWkt}`;
+      ? `postcode:${context.code}:${context.addressPoint?.lat ?? ""}:${context.addressPoint?.lon ?? ""}`
+      : `${context.kind}:${context.geometrieWkt}:${context.addressPoint?.lat ?? ""}:${context.addressPoint?.lon ?? ""}`;
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -124,16 +127,17 @@ export default function AreaMap({ context }: AreaMapProps) {
         const pc = parseInt(context.code, 10);
         feature =
           geojson.features.find((f) => f.properties?.postcode === pc) ?? null;
-        if (!feature) {
-          setError("Postcode area not found on map");
-          return;
-        }
       } else {
         feature = wktToFeature(context.geometrieWkt);
-        if (!feature) {
-          setError("Could not load boundary for this area");
-          return;
-        }
+      }
+
+      if (!feature && !context.addressPoint) {
+        setError(
+          context.kind === "postcode"
+            ? "Postcode area not found on map"
+            : "Could not load boundary for this area"
+        );
+        return;
       }
 
       setError(null);
@@ -154,19 +158,37 @@ export default function AreaMap({ context }: AreaMapProps) {
         }
       ).addTo(map);
 
-      const layer = L.geoJSON(feature, {
-        style: {
-          color: "#E65100",
-          weight: 3,
-          dashArray: "8, 6",
-          fillColor: "#E65100",
-          fillOpacity: 0.08,
-          opacity: 0.9,
-        },
-      }).addTo(map);
+      if (feature) {
+        const layer = L.geoJSON(feature, {
+          style: {
+            color: "#E65100",
+            weight: 3,
+            dashArray: "8, 6",
+            fillColor: "#E65100",
+            fillOpacity: 0.08,
+            opacity: 0.9,
+          },
+        }).addTo(map);
+        map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+      } else if (context.addressPoint) {
+        // No boundary — center on the address with a street-level zoom
+        map.setView([context.addressPoint.lat, context.addressPoint.lon], 16);
+      }
 
-      const bounds = layer.getBounds();
-      map.fitBounds(bounds, { padding: [30, 30] });
+      if (context.addressPoint) {
+        const addressIcon = L.divIcon({
+          className: "area-map-pin area-map-pin--address",
+          html: "📍",
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],   // bottom of pin sits on the point
+        });
+        L.marker(
+          [context.addressPoint.lat, context.addressPoint.lon],
+          { icon: addressIcon }
+        )
+          .addTo(map)
+          .bindPopup(context.addressPoint.label);
+      }
 
       const schoolIcon = L.divIcon({
         className: "area-map-pin area-map-pin--school",
@@ -181,10 +203,11 @@ export default function AreaMap({ context }: AreaMapProps) {
         iconAnchor: [12, 12],
       });
 
-      const south = bounds.getSouth();
-      const west = bounds.getWest();
-      const north = bounds.getNorth();
-      const east = bounds.getEast();
+      const mapBounds = map.getBounds();
+      const south = mapBounds.getSouth();
+      const west = mapBounds.getWest();
+      const north = mapBounds.getNorth();
+      const east = mapBounds.getEast();
 
       // Schools: authoritative DUO data via our API
       try {
@@ -269,6 +292,12 @@ export default function AreaMap({ context }: AreaMapProps) {
     <div className="relative overflow-hidden rounded-xl border border-gray-100 bg-white">
       <div ref={mapRef} style={{ height: 520, width: "100%" }} />
       <div className="pointer-events-none absolute right-2 top-2 rounded-md bg-white/90 px-2 py-1.5 text-xs shadow-sm ring-1 ring-gray-100">
+        {context.addressPoint && (
+          <div className="flex items-center gap-1.5">
+            <span>📍</span>
+            <span className="text-gray-700">Your address</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <span>🏫</span>
           <span className="text-gray-700">School</span>
