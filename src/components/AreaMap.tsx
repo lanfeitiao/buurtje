@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
+import {
+  addCartoTileLayer,
+  fetchSchoolsInBbox,
+  loadLeaflet,
+  schoolIcon as makeSchoolIcon,
+} from "@/lib/mapHelpers";
 
 type AddressPoint = { lat: number; lon: number; label: string };
 
@@ -97,8 +103,7 @@ export default function AreaMap({ context }: AreaMapProps) {
     let cancelled = false;
 
     async function initMap() {
-      const L = (await import("leaflet")).default;
-      await import("leaflet/dist/leaflet.css");
+      const L = await loadLeaflet();
 
       if (cancelled || !mapRef.current) return;
 
@@ -148,15 +153,7 @@ export default function AreaMap({ context }: AreaMapProps) {
       });
       mapInstanceRef.current = map;
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> | Boundaries: &copy; CBS, &copy; ESRI Nederland | Schools: &copy; <a href="https://duo.nl/open_onderwijsdata/">DUO</a> (CC-BY 4.0)',
-          subdomains: "abcd",
-          maxZoom: 19,
-        }
-      ).addTo(map);
+      addCartoTileLayer(L, map);
 
       if (feature) {
         const layer = L.geoJSON(feature, {
@@ -190,12 +187,7 @@ export default function AreaMap({ context }: AreaMapProps) {
           .bindPopup(context.addressPoint.label);
       }
 
-      const schoolIcon = L.divIcon({
-        className: "area-map-pin area-map-pin--school",
-        html: "🏫",
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
+      const schoolIcon = makeSchoolIcon(L);
       const shopIcon = L.divIcon({
         className: "area-map-pin area-map-pin--shop",
         html: "🛒",
@@ -204,33 +196,18 @@ export default function AreaMap({ context }: AreaMapProps) {
       });
 
       const mapBounds = map.getBounds();
-      const south = mapBounds.getSouth();
-      const west = mapBounds.getWest();
-      const north = mapBounds.getNorth();
-      const east = mapBounds.getEast();
 
       // Schools: authoritative DUO data via our API
       try {
-        const bboxParam = `${south},${west},${north},${east}`;
-        const res = await fetch(`/api/schools?bbox=${bboxParam}`);
-        if (!cancelled && res.ok) {
-          const { schools } = (await res.json()) as {
-            schools: {
-              name: string;
-              lat: number;
-              lon: number;
-              denominatie?: string | null;
-            }[];
-          };
-          if (!cancelled) {
-            for (const s of schools) {
-              const popup = s.denominatie
-                ? `<strong>${s.name}</strong><br/><span style="color:#666">${s.denominatie}</span>`
-                : `<strong>${s.name}</strong>`;
-              L.marker([s.lat, s.lon], { icon: schoolIcon })
-                .addTo(map)
-                .bindPopup(popup);
-            }
+        const schools = await fetchSchoolsInBbox(mapBounds);
+        if (!cancelled) {
+          for (const s of schools) {
+            const popup = s.denominatie
+              ? `<strong>${s.name}</strong><br/><span style="color:#666">${s.denominatie}</span>`
+              : `<strong>${s.name}</strong>`;
+            L.marker([s.lat, s.lon], { icon: schoolIcon })
+              .addTo(map)
+              .bindPopup(popup);
           }
         }
       } catch {
@@ -239,7 +216,7 @@ export default function AreaMap({ context }: AreaMapProps) {
 
       // Supermarkets: Overpass (no authoritative Dutch dataset bundled)
       try {
-        const bboxOp = `${south},${west},${north},${east}`;
+        const bboxOp = `${mapBounds.getSouth()},${mapBounds.getWest()},${mapBounds.getNorth()},${mapBounds.getEast()}`;
         const q = `[out:json][timeout:15];(node["shop"="supermarket"](${bboxOp});way["shop"="supermarket"](${bboxOp}););out center tags;`;
         const res = await fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
