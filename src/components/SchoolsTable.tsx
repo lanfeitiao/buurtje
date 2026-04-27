@@ -4,6 +4,7 @@ import type { SchoolIndexEntry, SchoolAdvies } from "@/lib/types";
 
 interface SchoolsTableProps {
   schools: SchoolIndexEntry[] | null;
+  lowScoreSlugs: Set<string>;
 }
 
 function vwoPercent(a: SchoolAdvies | null): number | null {
@@ -14,7 +15,10 @@ function vwoPercent(a: SchoolAdvies | null): number | null {
   return Math.round((a.vwo / total) * 100);
 }
 
-export default function SchoolsTable({ schools }: SchoolsTableProps) {
+export default function SchoolsTable({
+  schools,
+  lowScoreSlugs,
+}: SchoolsTableProps) {
   if (schools === null) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5">
@@ -49,8 +53,16 @@ export default function SchoolsTable({ schools }: SchoolsTableProps) {
             <tbody className="divide-y divide-gray-100">
               {schools.map((s) => {
                 const vwo = vwoPercent(s.latestAdvies);
+                const isLow = lowScoreSlugs.has(s.slug);
                 return (
-                  <tr key={s.slug} className="hover:bg-gray-50">
+                  <tr
+                    key={s.slug}
+                    className={
+                      isLow
+                        ? "bg-red-50 hover:bg-red-100"
+                        : "hover:bg-gray-50"
+                    }
+                  >
                     <td className="px-4 py-2 font-medium">
                       <a
                         href={`https://allecijfers.nl/basisschool/${s.slug}/`}

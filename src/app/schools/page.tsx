@@ -6,7 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SchoolsMap from "@/components/SchoolsMap";
 import SchoolsTable from "@/components/SchoolsTable";
 import { buurtKey } from "@/lib/mapHelpers";
-import type { SchoolIndexEntry } from "@/lib/types";
+import { isLowScoring } from "@/lib/schoolStats";
+import type { SchoolIndexEntry, SchoolScore } from "@/lib/types";
+
+type GemeenteAverages = {
+  gemeente: { name: string; scores: SchoolScore[] };
+};
 
 const GEMEENTEN = [
   { slug: "haarlem", label: "Haarlem" },
@@ -26,6 +31,7 @@ function SchoolsPageContent() {
 
   const [buurten, setBuurten] = useState<GeoJSON.FeatureCollection | null>(null);
   const [schools, setSchools] = useState<SchoolIndexEntry[] | null>(null);
+  const [gemeenteScores, setGemeenteScores] = useState<SchoolScore[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // URL is the source of truth for the selection; derive a Set for fast lookup.
@@ -42,6 +48,7 @@ function SchoolsPageContent() {
     let cancelled = false;
     setBuurten(null);
     setSchools(null);
+    setGemeenteScores([]);
     setError(null);
     Promise.all([
       fetch(`/buurten/${slug}.json`).then((r) =>
@@ -50,11 +57,16 @@ function SchoolsPageContent() {
       fetch(`/schools/${slug}/index.json`).then((r) =>
         r.ok ? (r.json() as Promise<SchoolIndexEntry[]>) : Promise.reject(r.status)
       ),
+      // averages.json is best-effort — degrade gracefully if missing.
+      fetch(`/schools/${slug}/averages.json`).then((r) =>
+        r.ok ? (r.json() as Promise<GemeenteAverages>) : null
+      ),
     ])
-      .then(([b, s]) => {
+      .then(([b, s, a]) => {
         if (cancelled) return;
         setBuurten(b);
         setSchools(s);
+        setGemeenteScores(a?.gemeente?.scores ?? []);
       })
       .catch(() => {
         if (cancelled) return;
@@ -95,6 +107,15 @@ function SchoolsPageContent() {
       (s) => s.buurt != null && selectedBuurtKeys.has(buurtKey(s.buurt))
     );
   }, [schools, selectedBuurtKeys]);
+
+  // Slugs of schools to flag as "low scoring" — no published score, or
+  // strictly below the gemeente average for the same toets+year.
+  const lowScoreSlugs = useMemo(() => {
+    if (!schools) return new Set<string>();
+    return new Set(
+      schools.filter((s) => isLowScoring(s, gemeenteScores)).map((s) => s.slug)
+    );
+  }, [schools, gemeenteScores]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -166,8 +187,9 @@ function SchoolsPageContent() {
             schools={schools}
             selectedBuurtKeys={selectedBuurtKeys}
             onBuurtToggle={toggleBuurt}
+            lowScoreSlugs={lowScoreSlugs}
           />
-          <SchoolsTable schools={filteredSchools} />
+          <SchoolsTable schools={filteredSchools} lowScoreSlugs={lowScoreSlugs} />
         </div>
       )}
     </main>
