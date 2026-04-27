@@ -13,6 +13,8 @@ import Migration from "@/components/Migration";
 import HousingTypes from "@/components/HousingTypes";
 import ElectionResults from "@/components/ElectionResults";
 import AreaMap from "@/components/AreaMap";
+import CompareSetChip from "@/components/CompareSetChip";
+import CompareSetButton from "@/components/CompareSetButton";
 
 function HomeContent() {
   const [data, setData] = useState<PostcodeData | null>(null);
@@ -22,6 +24,7 @@ function HomeContent() {
   const [areaType, setAreaType] = useState<string | null>(null);
   const [buurtName, setBuurtName] = useState<string | null>(null);
   const [mapContext, setMapContext] = useState<MapContext | null>(null);
+  const [lastQuery, setLastQuery] = useState<string>("");
   const searchParams = useSearchParams();
   const autoSearchedRef = useRef(false);
 
@@ -35,6 +38,7 @@ function HomeContent() {
     setMapContext(null);
 
     try {
+      setLastQuery(query);
       const result = await resolveQuery(query);
 
       if (result.kind === "area") {
@@ -141,40 +145,50 @@ function HomeContent() {
               Buurtje
             </span>
           </div>
-          <Link
-            href="/history"
-            className="text-sm font-semibold"
-            style={{ color: "#E65100" }}
-          >
-            History
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/history"
+              className="text-sm font-semibold"
+              style={{ color: "#E65100" }}
+            >
+              History
+            </Link>
+            <CompareSetChip />
+          </div>
         </div>
         <PostcodeSearch onSearch={handleSearch} isLoading={isLoading} />
         {data && !isLoading && (
-          <div className="mt-3">
-            {matchedLabel && (
-              <p className="text-sm text-gray-500">
-                Matched: {matchedLabel}
-                {buurtName && (
-                  <>
-                    {" · "}
-                    <span className="font-medium text-gray-700">{buurtName}</span>
-                  </>
-                )}
-                {areaType && (
-                  <span className="ml-2 rounded bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-600">
-                    {areaType}
-                  </span>
-                )}
+          <div className="mt-3 flex items-start justify-between gap-3">
+            <div>
+              {matchedLabel && (
+                <p className="text-sm text-gray-500">
+                  Matched: {matchedLabel}
+                  {buurtName && (
+                    <>
+                      {" · "}
+                      <span className="font-medium text-gray-700">{buurtName}</span>
+                    </>
+                  )}
+                  {areaType && (
+                    <span className="ml-2 rounded bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-600">
+                      {areaType}
+                    </span>
+                  )}
+                </p>
+              )}
+              <p className="text-sm text-gray-600">
+                Showing results for{" "}
+                <span className="font-semibold" style={{ color: "#E65100" }}>
+                  {data.code}
+                </span>{" "}
+                — {data.location}
               </p>
-            )}
-            <p className="text-sm text-gray-600">
-              Showing results for{" "}
-              <span className="font-semibold" style={{ color: "#E65100" }}>
-                {data.code}
-              </span>{" "}
-              — {data.location}
-            </p>
+            </div>
+            <CompareSetButton
+              query={lastQuery}
+              label={matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code}
+              kind={(areaType as "buurt" | "wijk" | null) ?? "postcode"}
+            />
           </div>
         )}
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
