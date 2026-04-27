@@ -99,4 +99,12 @@ describe("compareSet", () => {
     clearCompareSet();
     expect(readCompareSet()).toEqual([]);
   });
+
+  test("isInCompareSet matches on normalized query", () => {
+    addToCompareSet({ query: "De Pijp", label: "L1", kind: "buurt", addedAt: 1 });
+    expect(isInCompareSet("De Pijp")).toBe(true);
+    expect(isInCompareSet("DE PIJP")).toBe(true);
+    expect(isInCompareSet("  de pijp  ")).toBe(true);
+    expect(isInCompareSet("Centrum")).toBe(false);
+  });
 });

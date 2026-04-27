@@ -71,7 +71,7 @@ export function clearCompareSet(): void {
   }
 }
 
-export function isInCompareSet(_query: string): boolean {
-  // implemented in a later step
-  return false;
+export function isInCompareSet(query: string): boolean {
+  const norm = normalize(query);
+  return readCompareSet().some((e) => normalize(e.query) === norm);
 }
