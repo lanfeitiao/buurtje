@@ -99,7 +99,9 @@ test("3. Remove a column on /compare", async ({ page }) => {
 
   await page.goto("/compare");
   await expect(page.locator("h4")).toHaveCount(3);
-  await expect(page.getByRole("link", { name: /^Compare/ })).toContainText("3");
+  // The chip on /compare itself is rendered as a non-navigating <span>.
+  // Match by text rather than role so the assertion works on both forms.
+  await expect(page.getByText(/^Compare\s*\d+$/).first()).toContainText("3");
 
   // Remove the middle column (1012)
   await page.getByRole("button", { name: "Remove 1012" }).click();
@@ -108,5 +110,5 @@ test("3. Remove a column on /compare", async ({ page }) => {
   await expect(page.locator("h4", { hasText: "1011" })).toBeVisible();
   await expect(page.locator("h4", { hasText: "1013" })).toBeVisible();
   await expect(page.locator("h4", { hasText: "1012" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /^Compare/ })).toContainText("2");
+  await expect(page.getByText(/^Compare\s*\d+$/).first()).toContainText("2");
 });
