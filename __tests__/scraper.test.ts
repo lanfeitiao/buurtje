@@ -164,7 +164,9 @@ describe("parsePostcodePage edge cases", () => {
     ]);
     const r = parsePostcodePage("1011", h);
     const total = r.migration.breakdown.reduce((s, b) => s + b.percentage, 0);
-    // Due to integer rounding the total should be ≈100 (within ±2)
+    // The implementation uses Math.round() on each percentage independently,
+    // so each of the three groups can be off by ±0.5, giving a worst-case
+    // total drift of ±1.5 → we allow ±2 to be safe.
     expect(total).toBeGreaterThanOrEqual(98);
     expect(total).toBeLessThanOrEqual(102);
     expect(r.migration.breakdown[0].count).toBe(5000);
