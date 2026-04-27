@@ -50,6 +50,11 @@ docs/superpowers/
 # Git worktrees
 .worktrees/
 
+# Playwright e2e artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 # OpenNext build output
 .open-next/
 
