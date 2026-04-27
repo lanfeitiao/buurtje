@@ -183,9 +183,12 @@ function parseAddress(html: string): {
   postcode: string | null;
   city: string | null;
 } {
-  // "Adres: |Santpoorterplein 28, |2023DN|, Haarlem.|" — tags between values.
-  // Strip tags inside the segment then regex.
-  const seg = html.match(/Adres:[\s\S]{0,400}?\./);
+  // The address sits inside a <p> element:
+  //   <strong>Adres: </strong>J.P. Coenstraat 41, <a href='/postcode/1215KN'>1215KN</a>, Hilversum.</p>
+  // Earlier we stopped the segment at the first ".", which broke for any
+  // street name containing a period ("J.P.", "Dr.", etc.). Anchor on the
+  // closing </p> instead.
+  const seg = html.match(/Adres:[\s\S]*?<\/p>/);
   if (!seg) return { street: null, postcode: null, city: null };
   const text = stripTags(decodeEntities(seg[0]));
   // stripTags can introduce stray whitespace around the postcode (e.g.
