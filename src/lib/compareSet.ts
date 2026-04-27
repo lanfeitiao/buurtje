@@ -11,6 +11,17 @@ function hasStorage(): boolean {
   }
 }
 
+function isCompareEntry(value: unknown): value is CompareEntry {
+  if (!value || typeof value !== "object") return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.query === "string" &&
+    typeof e.label === "string" &&
+    (e.kind === "postcode" || e.kind === "buurt" || e.kind === "wijk") &&
+    typeof e.addedAt === "number"
+  );
+}
+
 export function readCompareSet(): CompareEntry[] {
   if (!hasStorage()) return [];
   try {
@@ -18,7 +29,7 @@ export function readCompareSet(): CompareEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed as CompareEntry[];
+    return parsed.filter(isCompareEntry);
   } catch {
     return [];
   }

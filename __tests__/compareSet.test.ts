@@ -107,4 +107,19 @@ describe("compareSet", () => {
     expect(isInCompareSet("  de pijp  ")).toBe(true);
     expect(isInCompareSet("Centrum")).toBe(false);
   });
+
+  test("readCompareSet drops malformed entries without throwing", () => {
+    localStorage.setItem(
+      "buurtje:compare-set",
+      JSON.stringify([
+        { query: "good", label: "Good", kind: "buurt", addedAt: 1 },
+        { query: "missing-fields" },
+        { query: 123, label: "wrong type", kind: "buurt", addedAt: 2 },
+        "not even an object",
+      ])
+    );
+    const entries = readCompareSet();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].query).toBe("good");
+  });
 });
