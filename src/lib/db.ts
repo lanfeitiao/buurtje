@@ -30,23 +30,33 @@ export async function setPostcodeData(
 
 type ElectionWithoutSource = Omit<NonNullable<PostcodeData["election"]>, "source">;
 
-export async function getElectionData(
-  code: string
-): Promise<ElectionWithoutSource | null> {
-  const rows = await getDb()
-    .prepare(
-      "SELECT party, votes FROM election_data WHERE postcode = ? ORDER BY votes DESC"
-    )
-    .bind(code)
-    .all<{ party: string; votes: number }>();
+async function queryElectionRows(
+  sql: string,
+  bind: string
+): Promise<{ party: string; votes: number }[] | null> {
+  // Election data is optional — a missing table or DB-layer error should
+  // degrade gracefully (no election section) rather than fail the whole
+  // request. Cache lookups (postcode_data) and the scrape path stay strict.
+  try {
+    const rows = await getDb()
+      .prepare(sql)
+      .bind(bind)
+      .all<{ party: string; votes: number }>();
+    return rows.results ?? null;
+  } catch (err) {
+    console.warn("Election table query failed; returning null.", err);
+    return null;
+  }
+}
 
-  if (!rows.results || rows.results.length === 0) return null;
-
-  const totalVotes = rows.results.reduce((sum, r) => sum + r.votes, 0);
-
+function buildElection(
+  rows: { party: string; votes: number }[] | null
+): ElectionWithoutSource | null {
+  if (!rows || rows.length === 0) return null;
+  const totalVotes = rows.reduce((sum, r) => sum + r.votes, 0);
   return {
     year: 2025,
-    parties: rows.results.map((r) => ({
+    parties: rows.map((r) => ({
       name: r.party,
       votes: r.votes,
       percentage: Math.round((r.votes / totalVotes) * 1000) / 10,
@@ -55,29 +65,24 @@ export async function getElectionData(
   };
 }
 
+export async function getElectionData(
+  code: string
+): Promise<ElectionWithoutSource | null> {
+  const rows = await queryElectionRows(
+    "SELECT party, votes FROM election_data WHERE postcode = ? ORDER BY votes DESC",
+    code
+  );
+  return buildElection(rows);
+}
+
 export async function getAreaElectionData(
   areaCode: string
 ): Promise<ElectionWithoutSource | null> {
-  const rows = await getDb()
-    .prepare(
-      "SELECT party, votes FROM area_election_data WHERE area_code = ? ORDER BY votes DESC"
-    )
-    .bind(areaCode)
-    .all<{ party: string; votes: number }>();
-
-  if (!rows.results || rows.results.length === 0) return null;
-
-  const totalVotes = rows.results.reduce((sum, r) => sum + r.votes, 0);
-
-  return {
-    year: 2025,
-    parties: rows.results.map((r) => ({
-      name: r.party,
-      votes: r.votes,
-      percentage: Math.round((r.votes / totalVotes) * 1000) / 10,
-    })),
-    totalVotes,
-  };
+  const rows = await queryElectionRows(
+    "SELECT party, votes FROM area_election_data WHERE area_code = ? ORDER BY votes DESC",
+    areaCode
+  );
+  return buildElection(rows);
 }
 
 export type SchoolRow = {
