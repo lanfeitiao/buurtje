@@ -6,11 +6,13 @@ export interface CompareColumn {
   entry: CompareEntry;
   color: string;
   sublabel?: string; // e.g. data.location
+  status?: "loading" | "ok" | "error";
 }
 
 interface CompareColumnsProps {
   columns: CompareColumn[];
   onRemove: (query: string) => void;
+  onRetry?: (query: string) => void;
 }
 
 function badgeClasses(kind: CompareEntry["kind"]): string {
@@ -21,6 +23,7 @@ function badgeClasses(kind: CompareEntry["kind"]): string {
 export default function CompareColumns({
   columns,
   onRemove,
+  onRetry,
 }: CompareColumnsProps) {
   return (
     <div
@@ -30,7 +33,7 @@ export default function CompareColumns({
       }}
     >
       <div />
-      {columns.map(({ entry, color, sublabel }) => (
+      {columns.map(({ entry, color, sublabel, status }) => (
         <div
           key={entry.query}
           className="relative rounded-lg border border-gray-100 px-3 py-3"
@@ -56,6 +59,21 @@ export default function CompareColumns({
           </h4>
           {sublabel && (
             <p className="mt-0.5 text-xs text-gray-500">{sublabel}</p>
+          )}
+          {status === "error" && (
+            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-red-700">
+              <span>Couldn’t load.</span>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={() => onRetry(entry.query)}
+                  aria-label={`Retry loading ${entry.label}`}
+                  className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-100"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           )}
         </div>
       ))}

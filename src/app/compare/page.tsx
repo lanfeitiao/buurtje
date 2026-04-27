@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCompareSet } from "@/lib/useCompareSet";
 import { getCompareColor } from "@/lib/compareSet";
 import { resolveQuery } from "@/lib/resolveQuery";
@@ -116,10 +116,29 @@ export default function ComparePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries]);
 
+  const handleRetry = useCallback(async (query: string) => {
+    const target = entries.find((e) => e.query === query);
+    if (!target) return;
+    setResolutions((prev) =>
+      prev.map((r) =>
+        r.entry.query === query ? { ...r, data: null, status: "loading" } : r
+      )
+    );
+    const data = await fetchOne(target);
+    setResolutions((prev) =>
+      prev.map((r) =>
+        r.entry.query === query
+          ? { entry: r.entry, data, status: data ? "ok" : "error" }
+          : r
+      )
+    );
+  }, [entries]);
+
   const columns: CompareColumn[] = resolutions.map((r, i) => ({
     entry: r.entry,
     color: getCompareColor(i),
     sublabel: r.data?.location,
+    status: r.status,
   }));
 
   const statSections: StatSection[] = [
@@ -262,7 +281,7 @@ export default function ComparePage() {
         <div className="rounded-xl border border-gray-100 bg-white p-5">
           <div className="overflow-x-auto">
             <div style={{ minWidth: `${200 + resolutions.length * 140}px` }}>
-              <CompareColumns columns={columns} onRemove={remove} />
+              <CompareColumns columns={columns} onRemove={remove} onRetry={handleRetry} />
               <div className="mt-2">
                 <CompareStatTable
                   sections={statSections}
