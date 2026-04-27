@@ -30,6 +30,18 @@ export function schoolIcon(L: LeafletNS) {
   });
 }
 
+// Variant for schools that lack a published score or score below the
+// gemeente average. Same emoji, ringed in red so it reads as the same
+// thing visually but flags attention. Styling is in globals.css.
+export function schoolIconLow(L: LeafletNS) {
+  return L.divIcon({
+    className: "area-map-pin area-map-pin--school area-map-pin--school-low",
+    html: "🏫",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
 // Lowercase + dash-collapse identifier used to match a buurt polygon (CBS
 // `buurtnaam`) against a school's buurt (allecijfers display name). The two
 // sources mostly agree on names, with one consistent abbreviation gap: CBS
