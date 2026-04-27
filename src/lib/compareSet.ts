@@ -51,6 +51,7 @@ export function addToCompareSet(entry: CompareEntry): void {
 
     let next = merged;
     if (next.length > MAX_ENTRIES) {
+      // Drop the entries with the lowest addedAt until we're at the cap.
       next = [...merged]
         .sort((a, b) => a.addedAt - b.addedAt)
         .slice(merged.length - MAX_ENTRIES);
