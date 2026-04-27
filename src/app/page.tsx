@@ -238,7 +238,6 @@ function HomeContent() {
       autoSearchedRef.current = true;
       handleSearch(q.trim());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   return (
