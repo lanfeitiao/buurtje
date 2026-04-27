@@ -57,6 +57,37 @@ export type CompareEntry = {
   addedAt: number;
 };
 
+export type SchoolAdvies = {
+  year: string;
+  speciaal_praktijk: number;
+  vmbo_b_k: number;
+  vmbo_t: number;
+  havo: number;
+  vwo: number;
+  overig: number;
+};
+
+export type SchoolScore = {
+  toets: string;
+  year: string;
+  score: number;
+};
+
+// One row in public/schools/<gemeente>/index.json. Slim list shared by
+// SchoolsMap (markers) and SchoolsTable (rows).
+export type SchoolIndexEntry = {
+  slug: string;
+  name: string;
+  lat: number | null;
+  lon: number | null;
+  denominatie: string | null;
+  buurt: string | null;
+  buurtSlug: string | null;
+  latestLeerlingen: number | null;
+  latestScore: SchoolScore | null;
+  latestAdvies: SchoolAdvies | null;
+};
+
 // Per-buurt input shared by all `/compare` chart components.
 // Each chart receives its data column already paired with a stable
 // palette colour and the resolved PostcodeData (or null when fetching
