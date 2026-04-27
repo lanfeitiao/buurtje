@@ -49,7 +49,7 @@ async function queryElectionRows(
   }
 }
 
-function buildElection(
+export function buildElection(
   rows: { party: string; votes: number }[] | null
 ): ElectionWithoutSource | null {
   if (!rows || rows.length === 0) return null;
