@@ -63,7 +63,12 @@ export function removeFromCompareSet(query: string): void {
 }
 
 export function clearCompareSet(): void {
-  // implemented in a later step
+  if (!hasStorage()) return;
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // silent
+  }
 }
 
 export function isInCompareSet(_query: string): boolean {

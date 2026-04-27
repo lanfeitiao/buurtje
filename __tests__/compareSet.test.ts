@@ -92,4 +92,11 @@ describe("compareSet", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].query).toBe("Centrum");
   });
+
+  test("clearCompareSet empties the list", () => {
+    addToCompareSet({ query: "De Pijp", label: "L1", kind: "buurt", addedAt: 1 });
+    addToCompareSet({ query: "Centrum", label: "L2", kind: "buurt", addedAt: 2 });
+    clearCompareSet();
+    expect(readCompareSet()).toEqual([]);
+  });
 });
