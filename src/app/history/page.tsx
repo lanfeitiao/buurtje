@@ -9,6 +9,7 @@ import HistoryList from "@/components/HistoryList";
 import CompareSetChip from "@/components/CompareSetChip";
 
 const MAX_ENTRIES = 50;
+const COMPARE_CAP = 4;
 
 function normalize(query: string): string {
   return query.trim().toLowerCase();
@@ -48,7 +49,7 @@ export default function HistoryPage() {
       const next = new Set(prev);
       if (next.has(norm)) {
         next.delete(norm);
-      } else {
+      } else if (next.size < COMPARE_CAP) {
         next.add(norm);
       }
       return next;
@@ -118,7 +119,7 @@ export default function HistoryPage() {
               {entries.length} of {MAX_ENTRIES} saved
               {mode === "select" && selected.size > 0 && (
                 <span className="ml-2 text-orange-600">
-                  · {selected.size} selected
+                  · {selected.size} of {COMPARE_CAP} selected
                 </span>
               )}
             </p>
