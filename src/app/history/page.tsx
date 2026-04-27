@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useHistory } from "@/lib/useHistory";
 import { useCompareSet } from "@/lib/useCompareSet";
 import HistoryList from "@/components/HistoryList";
@@ -12,12 +12,17 @@ import { normalizeQuery } from "@/lib/queryNormalize";
 const MAX_ENTRIES = 50;
 const COMPARE_CAP = 4;
 
-export default function HistoryPage() {
+function HistoryContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { entries, remove, clear } = useHistory();
-  const { clear: clearCompare, add: addCompare } = useCompareSet();
+  const { add: addCompare } = useCompareSet();
 
-  const [mode, setMode] = useState<"navigate" | "select">("navigate");
+  // Arriving with `?compare=1` (e.g. from "+ Add another" on /compare)
+  // opens the page directly in select mode so the user can tick rows.
+  const [mode, setMode] = useState<"navigate" | "select">(
+    searchParams.get("compare") === "1" ? "select" : "navigate"
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   function handleSelect(query: string) {
@@ -54,14 +59,13 @@ export default function HistoryPage() {
   }
 
   function handleCompareSelected() {
-    // Build the compare set from the selected entries, in original history
-    // order. Use the entries array (not the sorted display order) so the
-    // resulting columns reflect "added newest first" semantics consistent
-    // with how the home page records history.
+    // Append the selected entries onto the existing compare set rather than
+    // replacing it. The data layer's dedupe-as-no-op handles re-adds; the
+    // cap=4 with FIFO eviction handles overflow. Iterate entries (history
+    // order) — selected.has uses normalized keys so case/whitespace match.
     const chosen = entries.filter((e) => selected.has(normalizeQuery(e.query)));
-    if (chosen.length < 2) return;
+    if (chosen.length < 1) return;
 
-    clearCompare();
     chosen.forEach((entry, i) => {
       addCompare({
         query: entry.query,
@@ -142,7 +146,7 @@ export default function HistoryPage() {
         />
       </div>
 
-      {mode === "select" && selected.size >= 2 && (
+      {mode === "select" && selected.size >= 1 && (
         <div className="fixed bottom-6 right-6">
           <button
             type="button"
@@ -150,10 +154,18 @@ export default function HistoryPage() {
             className="rounded-full px-5 py-3 text-sm font-bold text-white shadow-lg"
             style={{ backgroundColor: "#E65100" }}
           >
-            Compare selected ({selected.size})
+            Add to compare ({selected.size})
           </button>
         </div>
       )}
     </main>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <HistoryContent />
+    </Suspense>
   );
 }

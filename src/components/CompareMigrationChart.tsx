@@ -6,8 +6,6 @@ interface CompareMigrationChartProps {
   columns: CompareDataColumn[];
 }
 
-const ORIGIN_COLORS = ["#E65100", "#FF8A65", "#FFCCBC"];
-
 export default function CompareMigrationChart({
   columns,
 }: CompareMigrationChartProps) {
@@ -16,65 +14,84 @@ export default function CompareMigrationChart({
   );
   if (usableColumns.length === 0) return null;
 
+  // Canonical origin order; anything else from the scraper lands after
+  // these in first-seen order.
+  const ORIGIN_ORDER = ["Nederland", "Europa", "Overig"];
+  const seen = new Set<string>();
+  for (const col of usableColumns) {
+    for (const item of col.data!.migration!.breakdown) {
+      seen.add(item.origin);
+    }
+  }
+  const origins = [
+    ...ORIGIN_ORDER.filter((o) => seen.has(o)),
+    ...[...seen].filter((o) => !ORIGIN_ORDER.includes(o)),
+  ];
+
+  // For each origin, look up each column's percentage (0 if missing).
+  const grouped = origins.map((origin) => ({
+    origin,
+    bars: columns.map((col) => {
+      const found = col.data?.migration?.breakdown.find((b) => b.origin === origin);
+      return { color: col.color, percentage: found?.percentage ?? 0 };
+    }),
+  }));
+
+  // Y-axis max — the highest single bar across all groups.
+  const yMax = Math.max(
+    1,
+    ...grouped.flatMap((g) => g.bars.map((b) => b.percentage))
+  );
+
+  // Use the first available year for the subtitle. All buurts in a given
+  // dataset share the same source year in practice.
+  const year = usableColumns[0]?.data?.migration?.year;
+
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5">
-      <h3 className="text-sm font-semibold text-gray-800">Migration — herkomst</h3>
+      <h3 className="text-sm font-semibold text-gray-800">
+        Migration — herkomst{year ? ` ${year}` : ""}
+      </h3>
       <p className="mt-0.5 text-[11px] text-gray-400">
-        Stacked breakdown per area.
+        % of inhabitants. Bars grouped per origin.
       </p>
 
-      <div
-        className="mt-4 grid gap-4"
-        style={{
-          gridTemplateColumns: `repeat(${usableColumns.length}, minmax(0, 1fr))`,
-        }}
-      >
-        {usableColumns.map((col) => {
-          const breakdown = col.data!.migration!.breakdown;
-          return (
-            <div key={col.entry.query} className="text-[11px]">
-              <div className="mb-1.5 flex items-center gap-1.5 font-semibold text-gray-800">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{ backgroundColor: col.color }}
-                />
-                {col.entry.label}
-                <span className="ml-auto text-[10px] font-normal text-gray-400">
-                  {col.data!.migration!.year}
-                </span>
-              </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-gray-600">
+        {columns.map((col) => (
+          <span key={col.entry.query} className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: col.color }}
+            />
+            {col.entry.label}
+          </span>
+        ))}
+      </div>
 
-              <div className="flex h-3 w-full overflow-hidden rounded-full">
-                {breakdown.map((item, i) => (
-                  <div
-                    key={item.origin}
-                    style={{
-                      width: `${item.percentage}%`,
-                      backgroundColor: ORIGIN_COLORS[i % ORIGIN_COLORS.length],
-                    }}
-                  />
-                ))}
-              </div>
-
-              <ul className="mt-2 space-y-0.5">
-                {breakdown.map((item, i) => (
-                  <li key={item.origin} className="flex items-center gap-2 text-[10px] text-gray-600">
-                    <span
-                      className="h-2 w-2 flex-shrink-0 rounded-sm"
-                      style={{ backgroundColor: ORIGIN_COLORS[i % ORIGIN_COLORS.length] }}
-                    />
-                    <span className="flex-1 truncate" title={item.origin}>
-                      {item.origin}
-                    </span>
-                    <span className="text-gray-400">
-                      {item.percentage.toFixed(1)}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
+      <div className="mt-4 flex items-end gap-5 px-1" style={{ minHeight: 130 }}>
+        {grouped.map(({ origin, bars }) => (
+          <div key={origin} className="flex-1 text-center text-[10px] text-gray-600">
+            <div className="flex h-[100px] items-end justify-center gap-1">
+              {bars.map((bar, i) => (
+                <div
+                  key={i}
+                  className="relative w-3.5 rounded-t-sm"
+                  style={{
+                    height: `${(bar.percentage / yMax) * 100}%`,
+                    backgroundColor: bar.color,
+                  }}
+                >
+                  <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-semibold text-gray-500">
+                    {bar.percentage.toFixed(0)}
+                  </span>
+                </div>
+              ))}
             </div>
-          );
-        })}
+            <div className="mt-1.5 truncate" title={origin}>
+              {origin}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

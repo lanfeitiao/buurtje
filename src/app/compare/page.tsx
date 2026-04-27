@@ -13,7 +13,6 @@ import CompareStatTable, {
 } from "@/components/CompareStatTable";
 import CompareElectionChart from "@/components/CompareElectionChart";
 import CompareMigrationChart from "@/components/CompareMigrationChart";
-import CompareHousingTypesChart from "@/components/CompareHousingTypesChart";
 
 type Resolution = {
   entry: CompareEntry;
@@ -42,12 +41,31 @@ function familiesWithKidsPercent(d: PostcodeData): number | null {
   return sum > 0 ? (hc.withKids / sum) * 100 : null;
 }
 
-function ownershipPercents(d: PostcodeData): { koop: number; huur: number } | null {
+// Returns the koop share as a percentage (huur is implicit: 100 - value).
+function koopPercent(d: PostcodeData): number | null {
   const o = d.housingTypes?.ownership;
   if (!o) return null;
   const total = o.koop + o.huur;
   if (total === 0) return null;
-  return { koop: (o.koop / total) * 100, huur: (o.huur / total) * 100 };
+  return (o.koop / total) * 100;
+}
+
+// Returns the huis share as a percentage (appartement is implicit: 100 - value).
+function huisPercent(d: PostcodeData): number | null {
+  const map = d.housingTypes?.buildingType;
+  if (!map) return null;
+  const huis = map.huis ?? 0;
+  const appartement = map.appartement ?? 0;
+  const total = huis + appartement;
+  if (total === 0) return null;
+  return (huis / total) * 100;
+}
+
+// Stat-table format for "this side / the other side" where the values
+// are complementary parts of 100%.
+function formatRatio(n: number): string {
+  const a = Math.round(n);
+  return `${a} / ${100 - a}`;
 }
 
 function distanceInMeters(d: { distance: number; unit: string }): number | null {
@@ -175,16 +193,16 @@ export default function ComparePage() {
       heading: "Housing",
       rows: [
         {
-          label: "Owner-occupied (koop)",
-          values: resolutions.map((r) => (r.data ? ownershipPercents(r.data)?.koop ?? null : null)),
-          format: formatPercent,
+          label: "Ownership (koop / huur)",
+          values: resolutions.map((r) => (r.data ? koopPercent(r.data) : null)),
+          format: formatRatio,
           direction: "higher",
         },
         {
-          label: "Rental (huur)",
-          values: resolutions.map((r) => (r.data ? ownershipPercents(r.data)?.huur ?? null : null)),
-          format: formatPercent,
-          direction: "none",
+          label: "Building type (huis / appartement)",
+          values: resolutions.map((r) => (r.data ? huisPercent(r.data) : null)),
+          format: formatRatio,
+          direction: "higher",
         },
       ],
     },
@@ -252,7 +270,11 @@ export default function ComparePage() {
         ) : (
           <p className="mt-1 text-xs text-gray-500">
             {entries.length} of 4 selected ·{" "}
-            <Link href="/" className="font-semibold" style={{ color: "#E65100" }}>
+            <Link
+              href="/history?compare=1"
+              className="font-semibold"
+              style={{ color: "#E65100" }}
+            >
               + Add another
             </Link>
             {" · "}
@@ -266,16 +288,6 @@ export default function ComparePage() {
           </p>
         )}
       </div>
-
-      {entries.length === 1 && (
-        <p className="mb-4 rounded-lg border border-orange-100 bg-orange-50 px-4 py-2 text-xs text-orange-800">
-          Add another buurt from the{" "}
-          <Link href="/" className="font-semibold underline">
-            home page
-          </Link>{" "}
-          to compare side-by-side.
-        </p>
-      )}
 
       {entries.length > 0 && (
         <div className="rounded-xl border border-gray-100 bg-white p-5">
@@ -303,13 +315,6 @@ export default function ComparePage() {
             }))}
           />
           <CompareMigrationChart
-            columns={resolutions.map((r, i) => ({
-              entry: r.entry,
-              color: getCompareColor(i),
-              data: r.data,
-            }))}
-          />
-          <CompareHousingTypesChart
             columns={resolutions.map((r, i) => ({
               entry: r.entry,
               color: getCompareColor(i),
