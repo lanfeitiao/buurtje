@@ -122,4 +122,16 @@ describe("compareSet", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].query).toBe("good");
   });
+
+  test("APIs degrade silently when localStorage is unavailable", () => {
+    uninstallLocalStorage();
+    expect(() =>
+      addToCompareSet({ query: "De Pijp", label: "L", kind: "buurt", addedAt: 1 })
+    ).not.toThrow();
+    expect(() => removeFromCompareSet("De Pijp")).not.toThrow();
+    expect(() => clearCompareSet()).not.toThrow();
+    expect(readCompareSet()).toEqual([]);
+    expect(isInCompareSet("De Pijp")).toBe(false);
+    installLocalStorage();
+  });
 });
