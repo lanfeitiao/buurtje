@@ -30,6 +30,20 @@ export function schoolIcon(L: LeafletNS) {
   });
 }
 
+// Lowercase + dash-collapse identifier used to match a buurt polygon (CBS
+// `buurtnaam`) against a school's buurt (allecijfers display name). Two
+// namespaces, same expected slugification rules — match isn't perfect when
+// the two sources disagree on the name itself (e.g. CBS "Binnenstad" vs
+// allecijfers "Centrum") but covers the common case.
+export function buurtKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export type School = {
   name: string;
   lat: number;

@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SchoolsMap from "@/components/SchoolsMap";
 import SchoolsTable from "@/components/SchoolsTable";
+import { buurtKey } from "@/lib/mapHelpers";
 import type { SchoolIndexEntry } from "@/lib/types";
 
 const GEMEENTEN = [
@@ -26,6 +27,16 @@ function SchoolsPageContent() {
   const [buurten, setBuurten] = useState<GeoJSON.FeatureCollection | null>(null);
   const [schools, setSchools] = useState<SchoolIndexEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // URL is the source of truth for the selection; derive a Set for fast lookup.
+  const buurtenParam = searchParams.get("buurten");
+  const selectedBuurtKeys = useMemo(
+    () =>
+      new Set(
+        buurtenParam ? buurtenParam.split(",").map((s) => s.trim()).filter(Boolean) : []
+      ),
+    [buurtenParam]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -57,8 +68,33 @@ function SchoolsPageContent() {
   function selectGemeente(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("gemeente", next);
+    // Switching gemeente clears the buurt selection — slugs from the previous
+    // gemeente wouldn't match anything in the new one anyway.
+    params.delete("buurten");
     router.replace(`/schools?${params.toString()}`);
   }
+
+  const toggleBuurt = useCallback(
+    (key: string) => {
+      const next = new Set(selectedBuurtKeys);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      const params = new URLSearchParams(searchParams.toString());
+      if (next.size) params.set("buurten", [...next].sort().join(","));
+      else params.delete("buurten");
+      router.replace(`/schools?${params.toString()}`);
+    },
+    [selectedBuurtKeys, searchParams, router]
+  );
+
+  // Schools shown in the table: filtered by selection, or all when empty.
+  const filteredSchools = useMemo(() => {
+    if (!schools) return null;
+    if (selectedBuurtKeys.size === 0) return schools;
+    return schools.filter(
+      (s) => s.buurt != null && selectedBuurtKeys.has(buurtKey(s.buurt))
+    );
+  }, [schools, selectedBuurtKeys]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -101,6 +137,22 @@ function SchoolsPageContent() {
             );
           })}
         </div>
+        {selectedBuurtKeys.size > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <span className="font-medium">Selected buurten:</span>
+            {[...selectedBuurtKeys].sort().map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => toggleBuurt(k)}
+                className="rounded-full border border-gray-200 px-2 py-0.5 hover:bg-gray-50"
+                title="Click to remove"
+              >
+                {k} ✕
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error ? (
@@ -109,8 +161,13 @@ function SchoolsPageContent() {
         </div>
       ) : (
         <div className="space-y-4">
-          <SchoolsMap buurten={buurten} schools={schools} />
-          <SchoolsTable schools={schools} />
+          <SchoolsMap
+            buurten={buurten}
+            schools={schools}
+            selectedBuurtKeys={selectedBuurtKeys}
+            onBuurtToggle={toggleBuurt}
+          />
+          <SchoolsTable schools={filteredSchools} />
         </div>
       )}
     </main>

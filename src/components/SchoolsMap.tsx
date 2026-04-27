@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Map as LeafletMap } from "leaflet";
+import type {
+  GeoJSON as LeafletGeoJSON,
+  Map as LeafletMap,
+  Path,
+} from "leaflet";
 import {
   addCartoTileLayer,
+  buurtKey,
   loadLeaflet,
   schoolIcon as makeSchoolIcon,
 } from "@/lib/mapHelpers";
@@ -12,12 +17,45 @@ import type { SchoolIndexEntry } from "@/lib/types";
 interface SchoolsMapProps {
   buurten: GeoJSON.FeatureCollection | null;
   schools: SchoolIndexEntry[] | null;
+  selectedBuurtKeys: Set<string>;
+  onBuurtToggle: (key: string) => void;
 }
 
-export default function SchoolsMap({ buurten, schools }: SchoolsMapProps) {
+const STYLE_DEFAULT = {
+  color: "#E65100",
+  weight: 1.5,
+  fillColor: "#E65100",
+  fillOpacity: 0.06,
+  opacity: 0.7,
+};
+
+const STYLE_SELECTED = {
+  color: "#E65100",
+  weight: 2.5,
+  fillColor: "#E65100",
+  fillOpacity: 0.25,
+  opacity: 0.95,
+};
+
+export default function SchoolsMap({
+  buurten,
+  schools,
+  selectedBuurtKeys,
+  onBuurtToggle,
+}: SchoolsMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const buurtenLayerRef = useRef<LeafletGeoJSON | null>(null);
 
+  // Stable callback ref so the click handler attached during init can call
+  // the latest `onBuurtToggle` without re-attaching on every render.
+  const onBuurtToggleRef = useRef(onBuurtToggle);
+  useEffect(() => {
+    onBuurtToggleRef.current = onBuurtToggle;
+  }, [onBuurtToggle]);
+
+  // Init map + polygons + markers. Re-runs only when the underlying data
+  // changes (gemeente switch), not on selection changes.
   useEffect(() => {
     if (!mapRef.current || !buurten) return;
     let cancelled = false;
@@ -29,6 +67,7 @@ export default function SchoolsMap({ buurten, schools }: SchoolsMapProps) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        buurtenLayerRef.current = null;
       }
 
       const map = L.map(mapRef.current, {
@@ -39,18 +78,16 @@ export default function SchoolsMap({ buurten, schools }: SchoolsMapProps) {
       addCartoTileLayer(L, map);
 
       const layer = L.geoJSON(buurten, {
-        style: {
-          color: "#E65100",
-          weight: 1.5,
-          fillColor: "#E65100",
-          fillOpacity: 0.06,
-          opacity: 0.7,
-        },
+        style: STYLE_DEFAULT,
         onEachFeature: (feature, lyr) => {
           const name = feature.properties?.buurtnaam;
-          if (name) lyr.bindPopup(`<strong>${name}</strong>`);
+          if (!name) return;
+          lyr.on("click", () => {
+            onBuurtToggleRef.current(buurtKey(name));
+          });
         },
       }).addTo(map);
+      buurtenLayerRef.current = layer;
       map.fitBounds(layer.getBounds(), { padding: [20, 20] });
 
       if (schools) {
@@ -77,9 +114,22 @@ export default function SchoolsMap({ buurten, schools }: SchoolsMapProps) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        buurtenLayerRef.current = null;
       }
     };
   }, [buurten, schools]);
+
+  // Re-style polygons when the selection changes — without rebuilding the map.
+  useEffect(() => {
+    const layer = buurtenLayerRef.current;
+    if (!layer) return;
+    layer.eachLayer((lyr) => {
+      const feature = (lyr as unknown as { feature?: GeoJSON.Feature }).feature;
+      const name = feature?.properties?.buurtnaam;
+      const selected = name ? selectedBuurtKeys.has(buurtKey(name)) : false;
+      (lyr as Path).setStyle(selected ? STYLE_SELECTED : STYLE_DEFAULT);
+    });
+  }, [selectedBuurtKeys]);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-100 bg-white">
