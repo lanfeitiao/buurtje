@@ -7,6 +7,9 @@ interface HistoryListProps {
   entries: HistoryEntry[];
   onSelect: (query: string) => void;
   onRemove: (query: string) => void;
+  mode?: "navigate" | "select";
+  selected?: Set<string>;
+  onToggle?: (query: string) => void;
 }
 
 function badgeClasses(kind: HistoryEntry["kind"]): string {
@@ -14,10 +17,17 @@ function badgeClasses(kind: HistoryEntry["kind"]): string {
   return "bg-orange-50 text-orange-600";
 }
 
+function normalize(query: string): string {
+  return query.trim().toLowerCase();
+}
+
 export default function HistoryList({
   entries,
   onSelect,
   onRemove,
+  mode = "navigate",
+  selected,
+  onToggle,
 }: HistoryListProps) {
   if (entries.length === 0) {
     return (
@@ -40,37 +50,63 @@ export default function HistoryList({
 
   return (
     <ul className="divide-y divide-gray-100">
-      {sorted.map((entry) => (
-        <li
-          key={entry.query}
-          className="flex cursor-pointer items-center justify-between px-5 py-3 transition-colors hover:bg-orange-50"
-          onClick={() => onSelect(entry.query)}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-[15px] font-medium text-gray-900">
-              {entry.label}
-            </span>
-            <span
-              className={`rounded px-1.5 py-0.5 text-[11px] font-semibold lowercase ${badgeClasses(
-                entry.kind
-              )}`}
-            >
-              {entry.kind}
-            </span>
-          </div>
-          <button
-            type="button"
-            aria-label={`Remove ${entry.label}`}
-            className="rounded px-2 py-1 text-base text-gray-400 hover:bg-red-50 hover:text-red-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(entry.query);
-            }}
+      {sorted.map((entry) => {
+        const isSelected =
+          mode === "select" && selected?.has(normalize(entry.query));
+
+        function handleRowClick() {
+          if (mode === "select") {
+            onToggle?.(entry.query);
+          } else {
+            onSelect(entry.query);
+          }
+        }
+
+        return (
+          <li
+            key={entry.query}
+            className="flex cursor-pointer items-center justify-between px-5 py-3 transition-colors hover:bg-orange-50"
+            onClick={handleRowClick}
           >
-            ✕
-          </button>
-        </li>
-      ))}
+            <div className="flex items-center gap-3">
+              {mode === "select" && (
+                <span
+                  aria-hidden="true"
+                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
+                    isSelected
+                      ? "border-orange-600 text-white"
+                      : "border-gray-300 bg-white text-transparent"
+                  }`}
+                  style={isSelected ? { backgroundColor: "#E65100" } : undefined}
+                >
+                  ✓
+                </span>
+              )}
+              <span className="text-[15px] font-medium text-gray-900">
+                {entry.label}
+              </span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[11px] font-semibold lowercase ${badgeClasses(
+                  entry.kind
+                )}`}
+              >
+                {entry.kind}
+              </span>
+            </div>
+            <button
+              type="button"
+              aria-label={`Remove ${entry.label}`}
+              className="rounded px-2 py-1 text-base text-gray-400 hover:bg-red-50 hover:text-red-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(entry.query);
+              }}
+            >
+              ✕
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
