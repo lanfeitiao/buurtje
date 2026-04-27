@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SchoolsMap from "@/components/SchoolsMap";
+import SchoolsTable from "@/components/SchoolsTable";
 import type { SchoolIndexEntry } from "@/lib/types";
 
 const GEMEENTEN = [
@@ -107,7 +108,10 @@ function SchoolsPageContent() {
           <p className="text-sm text-gray-400">{error}</p>
         </div>
       ) : (
-        <SchoolsMap buurten={buurten} schools={schools} />
+        <div className="space-y-4">
+          <SchoolsMap buurten={buurten} schools={schools} />
+          <SchoolsTable schools={schools} />
+        </div>
       )}
     </main>
   );
