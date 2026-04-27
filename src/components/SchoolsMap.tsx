@@ -4,10 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import {
   addCartoTileLayer,
-  fetchSchoolsInBbox,
   loadLeaflet,
   schoolIcon as makeSchoolIcon,
 } from "@/lib/mapHelpers";
+
+type SchoolIndexEntry = {
+  slug: string;
+  name: string;
+  lat: number | null;
+  lon: number | null;
+  denominatie: string | null;
+  buurt: string | null;
+  buurtSlug: string | null;
+};
 
 interface SchoolsMapProps {
   gemeenteSlug: string;
@@ -71,13 +80,21 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
 
       const icon = makeSchoolIcon(L);
       try {
-        const schools = await fetchSchoolsInBbox(map.getBounds());
+        const res = await fetch(`/schools/${gemeenteSlug}/index.json`);
+        if (cancelled || !res.ok) return;
+        const schools = (await res.json()) as SchoolIndexEntry[];
         if (cancelled) return;
         for (const s of schools) {
-          const popup = s.denominatie
-            ? `<strong>${s.name}</strong><br/><span style="color:#666">${s.denominatie}</span>`
-            : `<strong>${s.name}</strong>`;
-          L.marker([s.lat, s.lon], { icon }).addTo(map).bindPopup(popup);
+          if (s.lat == null || s.lon == null) continue;
+          const denom = s.denominatie
+            ? `<br/><span style="color:#666">${s.denominatie}</span>`
+            : "";
+          const buurt = s.buurt
+            ? `<br/><span style="color:#999;font-size:0.85em">${s.buurt}</span>`
+            : "";
+          L.marker([s.lat, s.lon], { icon })
+            .addTo(map)
+            .bindPopup(`<strong>${s.name}</strong>${denom}${buurt}`);
         }
       } catch {
         // Schools fetch is best-effort
