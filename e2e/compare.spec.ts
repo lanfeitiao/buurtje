@@ -32,7 +32,7 @@ test("1. Add two buurts from home, view comparison", async ({ page }) => {
   await search(page, "1011");
   await waitForResult(page);
   await page.getByRole("button", { name: /Add to compare/ }).click();
-  await expect(page.getByRole("button", { name: /Added — remove/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Remove from compare/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Compare/ })).toContainText("1");
 
   await search(page, "1012");
@@ -63,7 +63,7 @@ test("2. Multi-select from history, view comparison", async ({ page }) => {
   await page.locator("li", { hasText: /1011/ }).first().click();
   await page.locator("li", { hasText: /1012/ }).first().click();
 
-  await page.getByRole("button", { name: /Compare selected \(2\)/ }).click();
+  await page.getByRole("button", { name: /Add to compare \(2\)/ }).click();
   await expect(page).toHaveURL(/\/compare$/);
 
   const headers = page.locator("h4");
