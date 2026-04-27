@@ -51,8 +51,16 @@ export default function SchoolsTable({ schools }: SchoolsTableProps) {
                 const vwo = vwoPercent(s.latestAdvies);
                 return (
                   <tr key={s.slug} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-medium text-gray-800">
-                      {s.name}
+                    <td className="px-4 py-2 font-medium">
+                      <a
+                        href={`https://allecijfers.nl/basisschool/${s.slug}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                        style={{ color: "#E65100" }}
+                      >
+                        {s.name}
+                      </a>
                     </td>
                     <td className="px-4 py-2 text-gray-600">
                       {s.buurt ?? "—"}
