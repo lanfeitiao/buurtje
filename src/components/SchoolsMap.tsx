@@ -11,6 +11,7 @@ import {
   buurtKey,
   loadLeaflet,
   schoolIcon as makeSchoolIcon,
+  schoolIconLow as makeSchoolIconLow,
 } from "@/lib/mapHelpers";
 import type { SchoolIndexEntry } from "@/lib/types";
 
@@ -19,6 +20,7 @@ interface SchoolsMapProps {
   schools: SchoolIndexEntry[] | null;
   selectedBuurtKeys: Set<string>;
   onBuurtToggle: (key: string) => void;
+  lowScoreSlugs: Set<string>;
 }
 
 const STYLE_DEFAULT = {
@@ -42,6 +44,7 @@ export default function SchoolsMap({
   schools,
   selectedBuurtKeys,
   onBuurtToggle,
+  lowScoreSlugs,
 }: SchoolsMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
@@ -91,7 +94,8 @@ export default function SchoolsMap({
       map.fitBounds(layer.getBounds(), { padding: [20, 20] });
 
       if (schools) {
-        const icon = makeSchoolIcon(L);
+        const iconDefault = makeSchoolIcon(L);
+        const iconLow = makeSchoolIconLow(L);
         for (const s of schools) {
           if (s.lat == null || s.lon == null) continue;
           const denom = s.denominatie
@@ -100,6 +104,7 @@ export default function SchoolsMap({
           const buurt = s.buurt
             ? `<br/><span style="color:#999;font-size:0.85em">${s.buurt}</span>`
             : "";
+          const icon = lowScoreSlugs.has(s.slug) ? iconLow : iconDefault;
           L.marker([s.lat, s.lon], { icon })
             .addTo(map)
             .bindPopup(`<strong>${s.name}</strong>${denom}${buurt}`);
@@ -117,7 +122,7 @@ export default function SchoolsMap({
         buurtenLayerRef.current = null;
       }
     };
-  }, [buurten, schools]);
+  }, [buurten, schools, lowScoreSlugs]);
 
   // Re-style polygons when the selection changes — without rebuilding the map.
   useEffect(() => {
@@ -138,6 +143,12 @@ export default function SchoolsMap({
         <div className="flex items-center gap-1.5">
           <span>🏫</span>
           <span className="text-gray-700">School</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5">
+          <span className="area-map-pin area-map-pin--school area-map-pin--school-low inline-block leading-none">
+            🏫
+          </span>
+          <span className="text-gray-700">No / below-avg score</span>
         </div>
       </div>
     </div>

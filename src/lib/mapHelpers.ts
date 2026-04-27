@@ -30,16 +30,31 @@ export function schoolIcon(L: LeafletNS) {
   });
 }
 
+// Variant for schools that lack a published score or score below the
+// gemeente average. Same emoji, ringed in red so it reads as the same
+// thing visually but flags attention. Styling is in globals.css.
+export function schoolIconLow(L: LeafletNS) {
+  return L.divIcon({
+    className: "area-map-pin area-map-pin--school area-map-pin--school-low",
+    html: "🏫",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
 // Lowercase + dash-collapse identifier used to match a buurt polygon (CBS
-// `buurtnaam`) against a school's buurt (allecijfers display name). Two
-// namespaces, same expected slugification rules — match isn't perfect when
-// the two sources disagree on the name itself (e.g. CBS "Binnenstad" vs
-// allecijfers "Centrum") but covers the common case.
+// `buurtnaam`) against a school's buurt (allecijfers display name). The two
+// sources mostly agree on names, with one consistent abbreviation gap: CBS
+// writes "X e.o." (Dutch for "en omgeving" — and surroundings) while
+// allecijfers writes the phrase out in full. Normalize to the long form
+// before slugifying so e.g. "Postjeskade e.o." and "Postjeskade en
+// omgeving" both yield "postjeskade-en-omgeving".
 export function buurtKey(name: string): string {
   return name
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/\be\.?\s*o\.?\b/g, "en omgeving")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }

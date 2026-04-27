@@ -303,6 +303,46 @@ function parseScoresTable(table: string): ScoreYear[] {
   return out;
 }
 
+function findTableWithHeaders(tables: string[], required: string[]): string | null {
+  for (const t of tables) {
+    if (required.every((s) => t.includes(s))) return t;
+  }
+  return null;
+}
+
+// Fallback for schools whose detail page omits the scores <table> entirely
+// (e.g. very small schools, single-toets schools — the data still lives in
+// the JS chart `grafiek_toetsen`). Long-format chart shape:
+//   [['Type toets','Schooljaar','Gemiddelde score','School / gemeente / Nederland'],
+//    ['IEP','2024-2025',84.23,'School of Understanding'],
+//    ['IEP','2023-2024',74.56,'School of Understanding'],
+//    ['IEP','2024-2025',81.52,'Gemeente Amstelveen'],
+//    ['IEP','2024-2025',77.84,'Nederland'], ...]
+// Keep rows whose 4th column is *neither* "Nederland" nor "Gemeente …".
+function parseScoresFromChart(html: string): ScoreYear[] {
+  const re = /arrayToDataTable\s*\(\s*(\[[\s\S]*?\])\s*\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const raw = m[1];
+    if (!/Type toets/.test(raw) || !/School \/ gemeente \/ Nederland/.test(raw)) continue;
+    const data = jsArrayToJson<(string | number)[][]>(raw);
+    if (!data || data.length < 2) continue;
+    const out: ScoreYear[] = [];
+    for (const row of data.slice(1)) {
+      if (row.length < 4) continue;
+      const who = String(row[3]);
+      if (who === "Nederland" || who.startsWith("Gemeente ")) continue;
+      const toets = String(row[0]);
+      const year = String(row[1]);
+      const score = typeof row[2] === "number" ? row[2] : parseFloat(String(row[2]));
+      if (!toets || !/^\d{4}-\d{4}$/.test(year) || !Number.isFinite(score)) continue;
+      out.push({ toets, year, score });
+    }
+    return out;
+  }
+  return [];
+}
+
 // --- Region aggregates (gemeente + nederland) ------------------------------
 //
 // The per-school detail page only shows a 3-category (Praktisch/Theoretisch/
@@ -506,7 +546,15 @@ function parseSchool(
   const denominatie = parseDenominatie(html);
   const { buurt, buurtSlug } = parseBuurt(html, gemeenteSlug);
   const leerlingen = tables[0] ? parseLeerlingenTable(tables[0]) : [];
-  const scores = tables[1] ? parseScoresTable(tables[1]) : [];
+  // Find the scores table by header content rather than positional index —
+  // some schools omit it, in which case fall back to the JS chart.
+  const scoresTable = findTableWithHeaders(tables, [
+    "Type toets",
+    "Schooljaar",
+    "Gemiddelde score",
+  ]);
+  let scores = scoresTable ? parseScoresTable(scoresTable) : [];
+  if (scores.length === 0) scores = parseScoresFromChart(html);
   const advies = parseAdviesHistory(html);
 
   return {
