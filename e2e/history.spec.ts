@@ -171,3 +171,26 @@ test("11. Cross-tab sync — deleting in tab A reflects in tab B after reload", 
   await expect(tabB.getByText("No searches yet")).toBeVisible();
   await tabB.close();
 });
+
+test("12. Address search resolves to the buurt that contains it", async ({ page }) => {
+  // "Damrak 1 Amsterdam" sits in PDOK's "Nieuwendijk-Noord" buurt.
+  // Before the address→buurt change this would resolve to postcode 1012.
+  // After: it should resolve to the buurt and the saved entry's kind
+  // should be "buurt", with the address weergavenaam as the label.
+  await search(page, "Damrak 1 Amsterdam");
+  await waitForResult(page);
+
+  // The matched-label line should show a buurt chip (not nothing/postcode).
+  await expect(
+    page.locator("p", { hasText: /^Matched:/ }).getByText(/^buurt$/)
+  ).toBeVisible();
+
+  // The saved history entry should be kind=buurt with the address as label.
+  const stored = await page.evaluate(
+    (k) => JSON.parse(localStorage.getItem(k) || "[]"),
+    KEY
+  );
+  expect(stored).toHaveLength(1);
+  expect(stored[0].kind).toBe("buurt");
+  expect(stored[0].label).toMatch(/Damrak 1.*Amsterdam/i);
+});
