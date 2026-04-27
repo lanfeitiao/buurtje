@@ -1,60 +1,35 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import {
   addCartoTileLayer,
   loadLeaflet,
   schoolIcon as makeSchoolIcon,
 } from "@/lib/mapHelpers";
-
-type SchoolIndexEntry = {
-  slug: string;
-  name: string;
-  lat: number | null;
-  lon: number | null;
-  denominatie: string | null;
-  buurt: string | null;
-  buurtSlug: string | null;
-};
+import type { SchoolIndexEntry } from "@/lib/types";
 
 interface SchoolsMapProps {
-  gemeenteSlug: string;
+  buurten: GeoJSON.FeatureCollection | null;
+  schools: SchoolIndexEntry[] | null;
 }
 
-export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
+export default function SchoolsMap({ buurten, schools }: SchoolsMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !buurten) return;
     let cancelled = false;
 
     async function init() {
       const L = await loadLeaflet();
-      if (cancelled || !mapRef.current) return;
+      if (cancelled || !mapRef.current || !buurten) return;
 
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
-
-      let geojson: GeoJSON.FeatureCollection;
-      try {
-        const res = await fetch(`/buurten/${gemeenteSlug}.json`);
-        if (!res.ok) {
-          setError("Could not load gemeente boundaries");
-          return;
-        }
-        geojson = (await res.json()) as GeoJSON.FeatureCollection;
-      } catch {
-        setError("Could not load gemeente boundaries");
-        return;
-      }
-      if (cancelled || !mapRef.current) return;
-
-      setError(null);
 
       const map = L.map(mapRef.current, {
         zoomControl: true,
@@ -63,7 +38,7 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
       mapInstanceRef.current = map;
       addCartoTileLayer(L, map);
 
-      const layer = L.geoJSON(geojson, {
+      const layer = L.geoJSON(buurten, {
         style: {
           color: "#E65100",
           weight: 1.5,
@@ -78,12 +53,8 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
       }).addTo(map);
       map.fitBounds(layer.getBounds(), { padding: [20, 20] });
 
-      const icon = makeSchoolIcon(L);
-      try {
-        const res = await fetch(`/schools/${gemeenteSlug}/index.json`);
-        if (cancelled || !res.ok) return;
-        const schools = (await res.json()) as SchoolIndexEntry[];
-        if (cancelled) return;
+      if (schools) {
+        const icon = makeSchoolIcon(L);
         for (const s of schools) {
           if (s.lat == null || s.lon == null) continue;
           const denom = s.denominatie
@@ -96,8 +67,6 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
             .addTo(map)
             .bindPopup(`<strong>${s.name}</strong>${denom}${buurt}`);
         }
-      } catch {
-        // Schools fetch is best-effort
       }
     }
 
@@ -110,15 +79,7 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
         mapInstanceRef.current = null;
       }
     };
-  }, [gemeenteSlug]);
-
-  if (error) {
-    return (
-      <div className="rounded-xl border border-gray-100 bg-white p-5">
-        <p className="text-sm text-gray-400">{error}</p>
-      </div>
-    );
-  }
+  }, [buurten, schools]);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-100 bg-white">

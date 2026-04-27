@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SchoolsMap from "@/components/SchoolsMap";
+import type { SchoolIndexEntry } from "@/lib/types";
 
 const GEMEENTEN = [
   { slug: "haarlem", label: "Haarlem" },
@@ -20,6 +21,37 @@ function SchoolsPageContent() {
   const searchParams = useSearchParams();
   const raw = searchParams.get("gemeente");
   const slug = raw && VALID_SLUGS.has(raw) ? raw : DEFAULT_SLUG;
+
+  const [buurten, setBuurten] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [schools, setSchools] = useState<SchoolIndexEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBuurten(null);
+    setSchools(null);
+    setError(null);
+    Promise.all([
+      fetch(`/buurten/${slug}.json`).then((r) =>
+        r.ok ? (r.json() as Promise<GeoJSON.FeatureCollection>) : Promise.reject(r.status)
+      ),
+      fetch(`/schools/${slug}/index.json`).then((r) =>
+        r.ok ? (r.json() as Promise<SchoolIndexEntry[]>) : Promise.reject(r.status)
+      ),
+    ])
+      .then(([b, s]) => {
+        if (cancelled) return;
+        setBuurten(b);
+        setSchools(s);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("Could not load gemeente data");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
 
   function selectGemeente(next: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -70,7 +102,13 @@ function SchoolsPageContent() {
         </div>
       </div>
 
-      <SchoolsMap gemeenteSlug={slug} />
+      {error ? (
+        <div className="rounded-xl border border-gray-100 bg-white p-5">
+          <p className="text-sm text-gray-400">{error}</p>
+        </div>
+      ) : (
+        <SchoolsMap buurten={buurten} schools={schools} />
+      )}
     </main>
   );
 }
