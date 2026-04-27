@@ -74,6 +74,15 @@ async function resolveQuery(query: string): Promise<SearchResult> {
     return { kind: "postcode", code: query };
   }
 
+  // Full Dutch postcode (e.g. "1012LG" or "1012 LG"). Treat as a postcode
+  // search — otherwise the address-shape heuristic below would route it
+  // through PDOK's adres endpoint and we'd land in a buurt instead of the
+  // postcode the user explicitly typed.
+  const dutchPostcode = query.match(/^(\d{4})\s*[A-Z]{2}$/i);
+  if (dutchPostcode) {
+    return { kind: "postcode", code: dutchPostcode[1] };
+  }
+
   // PDOK's buurt/wijk endpoint matches greedily on tokens, so an address
   // query like "Damrak 1 Amsterdam" gets hijacked by an unrelated buurt
   // ("Gein 1 Amsterdam"). When the query looks address-shaped — has both a
