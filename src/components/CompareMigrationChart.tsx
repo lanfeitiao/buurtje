@@ -20,7 +20,7 @@ export default function CompareMigrationChart({
     <div className="rounded-xl border border-gray-100 bg-white p-5">
       <h3 className="text-sm font-semibold text-gray-800">Migration — herkomst</h3>
       <p className="mt-0.5 text-[11px] text-gray-400">
-        Stacked breakdown per area.
+        Breakdown per area.
       </p>
 
       <div
@@ -42,18 +42,6 @@ export default function CompareMigrationChart({
                 <span className="ml-auto text-[10px] font-normal text-gray-400">
                   {col.data!.migration!.year}
                 </span>
-              </div>
-
-              <div className="flex h-3 w-full overflow-hidden rounded-full">
-                {breakdown.map((item, i) => (
-                  <div
-                    key={item.origin}
-                    style={{
-                      width: `${item.percentage}%`,
-                      backgroundColor: ORIGIN_COLORS[i % ORIGIN_COLORS.length],
-                    }}
-                  />
-                ))}
               </div>
 
               <ul className="mt-2 space-y-0.5">
