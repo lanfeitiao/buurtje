@@ -61,6 +61,7 @@ type SearchResult =
       code: string;
       areaCode: string;
       label: string;
+      buurtName?: string;          // populated only on the address path
       geometrieWkt: string;
     };
 
@@ -73,7 +74,63 @@ async function resolveQuery(query: string): Promise<SearchResult> {
     return { kind: "postcode", code: query };
   }
 
-  // 1. Try as buurt/wijk first (neighborhood search is the new priority)
+  // PDOK's buurt/wijk endpoint matches greedily on tokens, so an address
+  // query like "Damrak 1 Amsterdam" gets hijacked by an unrelated buurt
+  // ("Gein 1 Amsterdam"). When the query looks address-shaped — has both a
+  // digit and a letter — try the address branch first and fall through to
+  // buurt/wijk only if it didn't yield anything useful.
+  const isAddressShape = /\d/.test(query) && /[a-z]/i.test(query);
+
+  // Helper: try resolving as an address. Returns a SearchResult if PDOK
+  // gives us either full buurt info (preferred — yields kind:"area") or
+  // just a postcode (fallback — yields kind:"postcode").
+  const tryAddress = async (): Promise<SearchResult | null> => {
+    const adresDoc = await pdokSearch(
+      query,
+      "type:adres",
+      "postcode,weergavenaam,buurtcode,buurtnaam,wijkcode,wijknaam,gemeentenaam"
+    );
+    if (
+      adresDoc?.buurtcode &&
+      adresDoc?.buurtnaam &&
+      adresDoc?.gemeentenaam &&
+      adresDoc?.postcode
+    ) {
+      // PDOK adres docs carry the address point in geometrie_ll, not the
+      // buurt polygon, so a follow-up call by buurtcode is needed for AreaMap.
+      const buurtDoc = await pdokSearch(
+        adresDoc.buurtcode,
+        "type:buurt",
+        "geometrie_ll"
+      );
+      const slug = `${toSlug(adresDoc.buurtnaam)}-${toSlug(adresDoc.gemeentenaam)}`;
+      return {
+        kind: "area",
+        areaType: "buurt",
+        slug,
+        code: adresDoc.postcode.substring(0, 4),
+        areaCode: adresDoc.buurtcode,
+        label: adresDoc.weergavenaam,
+        buurtName: adresDoc.buurtnaam,
+        geometrieWkt: buurtDoc?.geometrie_ll ?? "",
+      };
+    }
+    if (adresDoc?.postcode) {
+      return {
+        kind: "postcode",
+        code: adresDoc.postcode.substring(0, 4),
+        label: adresDoc.weergavenaam,
+      };
+    }
+    return null;
+  };
+
+  if (isAddressShape) {
+    const addressResult = await tryAddress();
+    if (addressResult) return addressResult;
+  }
+
+  // Try as buurt/wijk (the original step 1)
   const buurtDoc = await pdokSearch(
     query,
     "type:buurt OR type:wijk",
@@ -101,17 +158,14 @@ async function resolveQuery(query: string): Promise<SearchResult> {
     }
   }
 
-  // 2. Try as address
-  const adresDoc = await pdokSearch(query, "type:adres", "postcode,weergavenaam");
-  if (adresDoc?.postcode) {
-    return {
-      kind: "postcode",
-      code: adresDoc.postcode.substring(0, 4),
-      label: adresDoc.weergavenaam,
-    };
+  // Non-address-shaped queries try the address branch as a fallback (covers
+  // the rare case where a name-shaped query happens to be an address).
+  if (!isAddressShape) {
+    const addressResult = await tryAddress();
+    if (addressResult) return addressResult;
   }
 
-  // 3. Try as woonplaats
+  // Try as woonplaats (unchanged)
   const plaatsDoc = await pdokSearch(query, "type:woonplaats", "weergavenaam,centroide_ll");
   if (plaatsDoc?.centroide_ll) {
     const coords = parseCoords(plaatsDoc.centroide_ll);
@@ -136,6 +190,7 @@ function HomeContent() {
   const [error, setError] = useState<string | null>(null);
   const [matchedLabel, setMatchedLabel] = useState<string | null>(null);
   const [areaType, setAreaType] = useState<string | null>(null);
+  const [buurtName, setBuurtName] = useState<string | null>(null);
   const [mapContext, setMapContext] = useState<MapContext | null>(null);
   const searchParams = useSearchParams();
   const autoSearchedRef = useRef(false);
@@ -146,6 +201,7 @@ function HomeContent() {
     setData(null);
     setMatchedLabel(null);
     setAreaType(null);
+    setBuurtName(null);
     setMapContext(null);
 
     try {
@@ -154,6 +210,7 @@ function HomeContent() {
       if (result.kind === "area") {
         setMatchedLabel(result.label);
         setAreaType(result.areaType);
+        setBuurtName(result.buurtName ?? null);
         setMapContext({
           kind: result.areaType,
           geometrieWkt: result.geometrieWkt,
@@ -183,6 +240,7 @@ function HomeContent() {
         // show postcode-level data instead
         if (result.code !== "0000") {
           setAreaType(null);
+          setBuurtName(null);
           setMapContext({ kind: "postcode", code: result.code });
           const fallback = await fetch(`/api/postcode/${result.code}`);
           if (fallback.ok) {
@@ -267,6 +325,12 @@ function HomeContent() {
             {matchedLabel && (
               <p className="text-sm text-gray-500">
                 Matched: {matchedLabel}
+                {buurtName && (
+                  <>
+                    {" · "}
+                    <span className="font-medium text-gray-700">{buurtName}</span>
+                  </>
+                )}
                 {areaType && (
                   <span className="ml-2 rounded bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-600">
                     {areaType}
