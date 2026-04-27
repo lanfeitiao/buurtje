@@ -67,4 +67,18 @@ describe("compareSet", () => {
     // Insertion order preserved: De Pijp first, Centrum second
     expect(entries.map((e) => e.query)).toEqual(["De Pijp", "Centrum"]);
   });
+
+  test("addToCompareSet caps at 4 entries, dropping the oldest by addedAt", () => {
+    addToCompareSet({ query: "q1", label: "L1", kind: "postcode", addedAt: 1 });
+    addToCompareSet({ query: "q2", label: "L2", kind: "postcode", addedAt: 2 });
+    addToCompareSet({ query: "q3", label: "L3", kind: "postcode", addedAt: 3 });
+    addToCompareSet({ query: "q4", label: "L4", kind: "postcode", addedAt: 4 });
+    addToCompareSet({ query: "q5", label: "L5", kind: "postcode", addedAt: 5 });
+
+    const entries = readCompareSet();
+    expect(entries).toHaveLength(4);
+    expect(entries.find((e) => e.query === "q1")).toBeUndefined();
+    expect(entries.find((e) => e.query === "q5")?.addedAt).toBe(5);
+    expect(entries.map((e) => e.query)).toEqual(["q2", "q3", "q4", "q5"]);
+  });
 });

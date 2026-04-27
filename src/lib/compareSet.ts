@@ -1,6 +1,7 @@
 import type { CompareEntry } from "@/lib/types";
 
 const KEY = "buurtje:compare-set";
+const MAX_ENTRIES = 4;
 
 function hasStorage(): boolean {
   try {
@@ -33,9 +34,17 @@ export function addToCompareSet(entry: CompareEntry): void {
     const norm = normalize(entry.query);
     const current = readCompareSet();
     if (current.some((e) => normalize(e.query) === norm)) {
-      return; // no-op on dedupe — do not reorder, do not update addedAt
+      return;
     }
-    const next = [...current, entry];
+    const merged = [...current, entry];
+
+    let next = merged;
+    if (next.length > MAX_ENTRIES) {
+      next = [...merged]
+        .sort((a, b) => a.addedAt - b.addedAt)
+        .slice(merged.length - MAX_ENTRIES);
+    }
+
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     // silent
