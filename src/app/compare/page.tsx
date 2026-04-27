@@ -260,13 +260,16 @@ export default function ComparePage() {
 
       {entries.length > 0 && (
         <div className="rounded-xl border border-gray-100 bg-white p-5">
-          <CompareColumns columns={columns} onRemove={remove} />
-
-          <div className="mt-2">
-            <CompareStatTable
-              sections={statSections}
-              columnCount={resolutions.length}
-            />
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: `${200 + resolutions.length * 140}px` }}>
+              <CompareColumns columns={columns} onRemove={remove} />
+              <div className="mt-2">
+                <CompareStatTable
+                  sections={statSections}
+                  columnCount={resolutions.length}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}

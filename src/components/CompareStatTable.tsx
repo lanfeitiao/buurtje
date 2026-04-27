@@ -58,7 +58,7 @@ export default function CompareStatTable({
                   key={`${section.heading}-${row.label}`}
                   className="border-b border-gray-100"
                 >
-                  <td className="w-[200px] px-3 py-2.5 text-gray-600">
+                  <td className="sticky left-0 z-10 w-[200px] bg-white px-3 py-2.5 text-gray-600">
                     {row.label}
                   </td>
                   {row.values.map((v, i) => (
