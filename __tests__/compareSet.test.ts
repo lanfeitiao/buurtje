@@ -81,4 +81,15 @@ describe("compareSet", () => {
     expect(entries.find((e) => e.query === "q5")?.addedAt).toBe(5);
     expect(entries.map((e) => e.query)).toEqual(["q2", "q3", "q4", "q5"]);
   });
+
+  test("removeFromCompareSet removes the matching entry by normalized query", () => {
+    addToCompareSet({ query: "De Pijp", label: "L1", kind: "buurt", addedAt: 1 });
+    addToCompareSet({ query: "Centrum", label: "L2", kind: "buurt", addedAt: 2 });
+
+    removeFromCompareSet("DE PIJP");
+
+    const entries = readCompareSet();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].query).toBe("Centrum");
+  });
 });

@@ -51,8 +51,15 @@ export function addToCompareSet(entry: CompareEntry): void {
   }
 }
 
-export function removeFromCompareSet(_query: string): void {
-  // implemented in a later step
+export function removeFromCompareSet(query: string): void {
+  if (!hasStorage()) return;
+  try {
+    const norm = normalize(query);
+    const next = readCompareSet().filter((e) => normalize(e.query) !== norm);
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // silent
+  }
 }
 
 export function clearCompareSet(): void {
