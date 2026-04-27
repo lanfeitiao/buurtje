@@ -6,34 +6,30 @@ interface CompareElectionChartProps {
   columns: CompareDataColumn[];
 }
 
-const TOP_N = 5;
+// Fixed list of parties to surface in the comparison view, in the
+// canonical display order. Anything not in this list is hidden.
+const SHOWN_PARTIES = [
+  "GROENLINKS / Partij van de Arbeid (PvdA)",
+  "D66",
+  "VVD",
+  "PVV (Partij voor de Vrijheid)",
+] as const;
 
 function shortName(party: string): string {
   const map: Record<string, string> = {
     "GROENLINKS / Partij van de Arbeid (PvdA)": "GL-PvdA",
     "PVV (Partij voor de Vrijheid)": "PVV",
-    "SP (Socialistische Partij)": "SP",
-    "Partij voor de Dieren": "PvdD",
   };
   return map[party] || party;
 }
 
 export default function CompareElectionChart({ columns }: CompareElectionChartProps) {
-  // Build a map of party -> max(percentage across columns) and pick top N.
-  const partyMax = new Map<string, number>();
-  for (const col of columns) {
-    if (!col.data?.election) continue;
-    for (const p of col.data.election.parties) {
-      partyMax.set(p.name, Math.max(partyMax.get(p.name) ?? 0, p.percentage));
-    }
-  }
+  const hasAnyElectionData = columns.some((col) => col.data?.election);
+  if (!hasAnyElectionData) return null;
 
-  if (partyMax.size === 0) return null;
-
-  const topParties = [...partyMax.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, TOP_N)
-    .map(([name]) => name);
+  // Render the four allowed parties in their canonical order, regardless
+  // of vote share. Any party not present in a column's data renders as 0.
+  const topParties: string[] = [...SHOWN_PARTIES];
 
   // For each party, look up each column's percentage (or 0 if missing).
   const grouped = topParties.map((party) => ({
