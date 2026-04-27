@@ -1,4 +1,5 @@
 import type { HistoryEntry } from "@/lib/types";
+import { normalizeQuery } from "@/lib/queryNormalize";
 
 const KEY = "buurtje:search-history";
 const MAX_ENTRIES = 50;
@@ -35,15 +36,11 @@ export function readHistory(): HistoryEntry[] {
   }
 }
 
-function normalize(query: string): string {
-  return query.trim().toLowerCase();
-}
-
 export function addToHistory(entry: HistoryEntry): void {
   if (!hasStorage()) return;
   try {
-    const norm = normalize(entry.query);
-    const current = readHistory().filter((e) => normalize(e.query) !== norm);
+    const norm = normalizeQuery(entry.query);
+    const current = readHistory().filter((e) => normalizeQuery(e.query) !== norm);
     const merged = [entry, ...current];
 
     let next = merged;
@@ -62,8 +59,8 @@ export function addToHistory(entry: HistoryEntry): void {
 export function removeFromHistory(query: string): void {
   if (!hasStorage()) return;
   try {
-    const norm = normalize(query);
-    const next = readHistory().filter((e) => normalize(e.query) !== norm);
+    const norm = normalizeQuery(query);
+    const next = readHistory().filter((e) => normalizeQuery(e.query) !== norm);
     localStorage.setItem(KEY, JSON.stringify(next));
     notifyChange();
   } catch {

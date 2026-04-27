@@ -7,13 +7,10 @@ import { useHistory } from "@/lib/useHistory";
 import { useCompareSet } from "@/lib/useCompareSet";
 import HistoryList from "@/components/HistoryList";
 import CompareSetChip from "@/components/CompareSetChip";
+import { normalizeQuery } from "@/lib/queryNormalize";
 
 const MAX_ENTRIES = 50;
 const COMPARE_CAP = 4;
-
-function normalize(query: string): string {
-  return query.trim().toLowerCase();
-}
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -44,7 +41,7 @@ export default function HistoryPage() {
   }
 
   function handleToggleEntry(query: string) {
-    const norm = normalize(query);
+    const norm = normalizeQuery(query);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(norm)) {
@@ -61,7 +58,7 @@ export default function HistoryPage() {
     // order. Use the entries array (not the sorted display order) so the
     // resulting columns reflect "added newest first" semantics consistent
     // with how the home page records history.
-    const chosen = entries.filter((e) => selected.has(normalize(e.query)));
+    const chosen = entries.filter((e) => selected.has(normalizeQuery(e.query)));
     if (chosen.length < 2) return;
 
     clearCompare();

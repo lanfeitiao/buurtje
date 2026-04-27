@@ -7,11 +7,8 @@ import {
   removeFromCompareSet,
   clearCompareSet,
 } from "@/lib/compareSet";
+import { normalizeQuery } from "@/lib/queryNormalize";
 import type { CompareEntry } from "@/lib/types";
-
-function normalize(query: string): string {
-  return query.trim().toLowerCase();
-}
 
 export function useCompareSet(): {
   entries: CompareEntry[];
@@ -53,7 +50,7 @@ export function useCompareSet(): {
   }, []);
 
   const contains = useCallback(
-    (query: string) => entries.some((e) => normalize(e.query) === normalize(query)),
+    (query: string) => entries.some((e) => normalizeQuery(e.query) === normalizeQuery(query)),
     [entries]
   );
 

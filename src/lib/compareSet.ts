@@ -1,4 +1,5 @@
 import type { CompareEntry } from "@/lib/types";
+import { normalizeQuery } from "@/lib/queryNormalize";
 
 const KEY = "buurtje:compare-set";
 const MAX_ENTRIES = 4;
@@ -35,16 +36,12 @@ export function readCompareSet(): CompareEntry[] {
   }
 }
 
-function normalize(query: string): string {
-  return query.trim().toLowerCase();
-}
-
 export function addToCompareSet(entry: CompareEntry): void {
   if (!hasStorage()) return;
   try {
-    const norm = normalize(entry.query);
+    const norm = normalizeQuery(entry.query);
     const current = readCompareSet();
-    if (current.some((e) => normalize(e.query) === norm)) {
+    if (current.some((e) => normalizeQuery(e.query) === norm)) {
       return;
     }
     const merged = [...current, entry];
@@ -67,8 +64,8 @@ export function addToCompareSet(entry: CompareEntry): void {
 export function removeFromCompareSet(query: string): void {
   if (!hasStorage()) return;
   try {
-    const norm = normalize(query);
-    const next = readCompareSet().filter((e) => normalize(e.query) !== norm);
+    const norm = normalizeQuery(query);
+    const next = readCompareSet().filter((e) => normalizeQuery(e.query) !== norm);
     localStorage.setItem(KEY, JSON.stringify(next));
     notifyChange();
   } catch {
@@ -87,8 +84,8 @@ export function clearCompareSet(): void {
 }
 
 export function isInCompareSet(query: string): boolean {
-  const norm = normalize(query);
-  return readCompareSet().some((e) => normalize(e.query) === norm);
+  const norm = normalizeQuery(query);
+  return readCompareSet().some((e) => normalizeQuery(e.query) === norm);
 }
 
 function notifyChange(): void {

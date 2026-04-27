@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { HistoryEntry } from "@/lib/types";
+import { normalizeQuery } from "@/lib/queryNormalize";
 
 interface HistoryListProps {
   entries: HistoryEntry[];
@@ -15,10 +16,6 @@ interface HistoryListProps {
 function badgeClasses(kind: HistoryEntry["kind"]): string {
   if (kind === "postcode") return "bg-gray-100 text-gray-600";
   return "bg-orange-50 text-orange-600";
-}
-
-function normalize(query: string): string {
-  return query.trim().toLowerCase();
 }
 
 export default function HistoryList({
@@ -52,7 +49,7 @@ export default function HistoryList({
     <ul className="divide-y divide-gray-100">
       {sorted.map((entry) => {
         const isSelected =
-          mode === "select" && selected?.has(normalize(entry.query));
+          mode === "select" && selected?.has(normalizeQuery(entry.query));
 
         function handleRowClick() {
           if (mode === "select") {
