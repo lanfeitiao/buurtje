@@ -1,51 +1,77 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap } from "leaflet";
+import { useEffect, useRef } from "react";
+import type {
+  GeoJSON as LeafletGeoJSON,
+  Map as LeafletMap,
+  Path,
+} from "leaflet";
 import {
   addCartoTileLayer,
-  fetchSchoolsInBbox,
+  buurtKey,
   loadLeaflet,
   schoolIcon as makeSchoolIcon,
+  schoolIconLow as makeSchoolIconLow,
 } from "@/lib/mapHelpers";
+import type { SchoolIndexEntry } from "@/lib/types";
 
 interface SchoolsMapProps {
-  gemeenteSlug: string;
+  buurten: GeoJSON.FeatureCollection | null;
+  schools: SchoolIndexEntry[] | null;
+  selectedBuurtKeys: Set<string>;
+  onBuurtToggle: (key: string) => void;
+  lowScoreSlugs: Set<string>;
 }
 
-export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
+const STYLE_DEFAULT = {
+  color: "#E65100",
+  weight: 1.5,
+  fillColor: "#E65100",
+  fillOpacity: 0.06,
+  opacity: 0.7,
+};
+
+const STYLE_SELECTED = {
+  color: "#E65100",
+  weight: 2.5,
+  fillColor: "#E65100",
+  fillOpacity: 0.25,
+  opacity: 0.95,
+};
+
+export default function SchoolsMap({
+  buurten,
+  schools,
+  selectedBuurtKeys,
+  onBuurtToggle,
+  lowScoreSlugs,
+}: SchoolsMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const buurtenLayerRef = useRef<LeafletGeoJSON | null>(null);
 
+  // Stable callback ref so the click handler attached during init can call
+  // the latest `onBuurtToggle` without re-attaching on every render.
+  const onBuurtToggleRef = useRef(onBuurtToggle);
   useEffect(() => {
-    if (!mapRef.current) return;
+    onBuurtToggleRef.current = onBuurtToggle;
+  }, [onBuurtToggle]);
+
+  // Init map + polygons + markers. Re-runs only when the underlying data
+  // changes (gemeente switch), not on selection changes.
+  useEffect(() => {
+    if (!mapRef.current || !buurten) return;
     let cancelled = false;
 
     async function init() {
       const L = await loadLeaflet();
-      if (cancelled || !mapRef.current) return;
+      if (cancelled || !mapRef.current || !buurten) return;
 
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        buurtenLayerRef.current = null;
       }
-
-      let geojson: GeoJSON.FeatureCollection;
-      try {
-        const res = await fetch(`/buurten/${gemeenteSlug}.json`);
-        if (!res.ok) {
-          setError("Could not load gemeente boundaries");
-          return;
-        }
-        geojson = (await res.json()) as GeoJSON.FeatureCollection;
-      } catch {
-        setError("Could not load gemeente boundaries");
-        return;
-      }
-      if (cancelled || !mapRef.current) return;
-
-      setError(null);
 
       const map = L.map(mapRef.current, {
         zoomControl: true,
@@ -54,33 +80,35 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
       mapInstanceRef.current = map;
       addCartoTileLayer(L, map);
 
-      const layer = L.geoJSON(geojson, {
-        style: {
-          color: "#E65100",
-          weight: 1.5,
-          fillColor: "#E65100",
-          fillOpacity: 0.06,
-          opacity: 0.7,
-        },
+      const layer = L.geoJSON(buurten, {
+        style: STYLE_DEFAULT,
         onEachFeature: (feature, lyr) => {
           const name = feature.properties?.buurtnaam;
-          if (name) lyr.bindPopup(`<strong>${name}</strong>`);
+          if (!name) return;
+          lyr.on("click", () => {
+            onBuurtToggleRef.current(buurtKey(name));
+          });
         },
       }).addTo(map);
+      buurtenLayerRef.current = layer;
       map.fitBounds(layer.getBounds(), { padding: [20, 20] });
 
-      const icon = makeSchoolIcon(L);
-      try {
-        const schools = await fetchSchoolsInBbox(map.getBounds());
-        if (cancelled) return;
+      if (schools) {
+        const iconDefault = makeSchoolIcon(L);
+        const iconLow = makeSchoolIconLow(L);
         for (const s of schools) {
-          const popup = s.denominatie
-            ? `<strong>${s.name}</strong><br/><span style="color:#666">${s.denominatie}</span>`
-            : `<strong>${s.name}</strong>`;
-          L.marker([s.lat, s.lon], { icon }).addTo(map).bindPopup(popup);
+          if (s.lat == null || s.lon == null) continue;
+          const denom = s.denominatie
+            ? `<br/><span style="color:#666">${s.denominatie}</span>`
+            : "";
+          const buurt = s.buurt
+            ? `<br/><span style="color:#999;font-size:0.85em">${s.buurt}</span>`
+            : "";
+          const icon = lowScoreSlugs.has(s.slug) ? iconLow : iconDefault;
+          L.marker([s.lat, s.lon], { icon })
+            .addTo(map)
+            .bindPopup(`<strong>${s.name}</strong>${denom}${buurt}`);
         }
-      } catch {
-        // Schools fetch is best-effort
       }
     }
 
@@ -91,17 +119,22 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        buurtenLayerRef.current = null;
       }
     };
-  }, [gemeenteSlug]);
+  }, [buurten, schools, lowScoreSlugs]);
 
-  if (error) {
-    return (
-      <div className="rounded-xl border border-gray-100 bg-white p-5">
-        <p className="text-sm text-gray-400">{error}</p>
-      </div>
-    );
-  }
+  // Re-style polygons when the selection changes — without rebuilding the map.
+  useEffect(() => {
+    const layer = buurtenLayerRef.current;
+    if (!layer) return;
+    layer.eachLayer((lyr) => {
+      const feature = (lyr as unknown as { feature?: GeoJSON.Feature }).feature;
+      const name = feature?.properties?.buurtnaam;
+      const selected = name ? selectedBuurtKeys.has(buurtKey(name)) : false;
+      (lyr as Path).setStyle(selected ? STYLE_SELECTED : STYLE_DEFAULT);
+    });
+  }, [selectedBuurtKeys]);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-100 bg-white">
@@ -110,6 +143,12 @@ export default function SchoolsMap({ gemeenteSlug }: SchoolsMapProps) {
         <div className="flex items-center gap-1.5">
           <span>🏫</span>
           <span className="text-gray-700">School</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5">
+          <span className="area-map-pin area-map-pin--school area-map-pin--school-low inline-block leading-none">
+            🏫
+          </span>
+          <span className="text-gray-700">No / below-avg score</span>
         </div>
       </div>
     </div>
