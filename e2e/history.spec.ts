@@ -194,3 +194,21 @@ test("12. Address search resolves to the buurt that contains it", async ({ page 
   expect(stored[0].kind).toBe("buurt");
   expect(stored[0].label).toMatch(/Damrak 1.*Amsterdam/i);
 });
+
+test("13. Address marker appears on the map for address searches", async ({ page }) => {
+  // The address-pin-on-map feature renders a 📍 divIcon marker for any
+  // search where PDOK gave us address coordinates. This test asserts:
+  //  1. the marker is visible on the map
+  //  2. clicking it opens a popup containing the address weergavenaam.
+  await search(page, "Damrak 1 Amsterdam");
+  await waitForResult(page);
+
+  // Leaflet renders the marker after fitBounds; allow a generous timeout.
+  const marker = page.locator(".area-map-pin--address").first();
+  await expect(marker).toBeVisible({ timeout: 15_000 });
+
+  await marker.click();
+  const popup = page.locator(".leaflet-popup-content");
+  await expect(popup).toBeVisible({ timeout: 5_000 });
+  await expect(popup).toHaveText(/Damrak 1.*Amsterdam/i);
+});
