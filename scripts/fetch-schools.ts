@@ -17,8 +17,18 @@
 
 import fs from "fs";
 import path from "path";
+import pc from "picocolors";
 
 const ALLECIJFERS = "https://allecijfers.nl";
+
+// Display name shown in allecijfers' comparison blocks ("Gemeente Haarlem").
+// Falls back to title-casing the slug for ad-hoc additions.
+const GEMEENTE_DISPLAY_NAMES: Record<string, string> = {
+  haarlem: "Haarlem",
+  amsterdam: "Amsterdam",
+  amstelveen: "Amstelveen",
+  hilversum: "Hilversum",
+};
 const PDOK_URL =
   "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free";
 const OUT_DIR = path.join(process.cwd(), "public", "schools");
@@ -71,6 +81,29 @@ type School = {
 };
 
 type Cache = Record<string, School>;
+
+type RegionScoreRow = { toets: string; year: string; score: number };
+type RegionAdviesRow = {
+  year: string;
+  speciaal_praktijk: number;
+  vmbo_b_k: number;
+  vmbo_t: number;
+  havo: number;
+  vwo: number;
+  overig: number;
+};
+// Region (gemeente or nederland) aggregate counts. Note that advies values
+// are absolute leerling counts, not percentages — different unit from the
+// per-school `advies` history (which is %). Consumers can derive % per row
+// by summing the six categories.
+type RegionAggregate = {
+  advies: RegionAdviesRow[];
+  scores: RegionScoreRow[];
+};
+type GemeenteAverages = {
+  gemeente: { name: string } & RegionAggregate;
+  nederland: RegionAggregate;
+};
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -267,6 +300,101 @@ function parseScoresTable(table: string): ScoreYear[] {
   return out;
 }
 
+// --- Region aggregates (gemeente + nederland) ------------------------------
+//
+// The per-school detail page only shows a 3-category (Praktisch/Theoretisch/
+// Overig) gemeente comparison. The full 6-category history lives on the
+// gemeente comparison page (/basisscholen/gemeente-<slug>/) — and the same
+// shape is published for Nederland (/basisscholen/nederland/). One extra
+// fetch per region lets us pull the full 6-cat history plus all toets-types
+// of scores, for both gemeente and Nederland.
+
+// Convert a JS array literal (single-quoted strings, trailing commas allowed)
+// into JSON we can parse. Returns null if the conversion fails.
+function jsArrayToJson<T>(raw: string): T | null {
+  try {
+    const json = raw
+      .replace(/,\s*([\]}])/g, "$1")
+      .replace(/'((?:[^'\\]|\\.)*)'/g, (_, s: string) => `"${s.replace(/"/g, '\\"')}"`);
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
+}
+
+function parseRegionAdviesHistory(html: string): RegionAdviesRow[] {
+  // [['Schooljaar','Speciaal/praktijk','VMBO-B/K','VMBO-T','HAVO','VWO','Overig'],
+  //  ['2024-2025', 67, 194, 300, 450, 741, 6], ...]
+  const re = /arrayToDataTable\s*\(\s*(\[[\s\S]*?\])\s*\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const raw = m[1];
+    if (!/Speciaal\/praktijk/.test(raw) || !/VMBO-B\/K/.test(raw)) continue;
+    const data = jsArrayToJson<(string | number)[][]>(raw);
+    if (!data || data.length < 2) continue;
+    const out: RegionAdviesRow[] = [];
+    for (const row of data.slice(1)) {
+      const year = String(row[0]);
+      if (!/^\d{4}-\d{4}$/.test(year)) continue;
+      const num = (i: number): number => {
+        const v = row[i];
+        if (typeof v === "number") return v;
+        const n = parseFloat(String(v));
+        return Number.isFinite(n) ? n : 0;
+      };
+      out.push({
+        year,
+        speciaal_praktijk: num(1),
+        vmbo_b_k: num(2),
+        vmbo_t: num(3),
+        havo: num(4),
+        vwo: num(5),
+        overig: num(6),
+      });
+    }
+    return out;
+  }
+  return [];
+}
+
+function parseRegionScoresHistory(html: string): RegionScoreRow[] {
+  // [['Schooljaar','Type toets','Gemiddelde score', { role: 'style' }],
+  //  ['2014-2015','Cito',534.46,'#feb24c'],
+  //  ['2014-2015','IEP',84.58,'#d62728'], ...]
+  const re = /arrayToDataTable\s*\(\s*(\[[\s\S]*?\])\s*\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const raw = m[1];
+    if (
+      !/Schooljaar/.test(raw) ||
+      !/Type toets/.test(raw) ||
+      !/Gemiddelde score/.test(raw)
+    )
+      continue;
+    // Strip { role: '...' } object literals so jsArrayToJson can parse the rest.
+    const cleaned = raw.replace(/\{[^{}]*\}/g, '"_"');
+    const data = jsArrayToJson<(string | number)[][]>(cleaned);
+    if (!data || data.length < 2) continue;
+    const out: RegionScoreRow[] = [];
+    for (const row of data.slice(1)) {
+      const year = String(row[0]);
+      const toets = String(row[1]);
+      const score = typeof row[2] === "number" ? row[2] : parseFloat(String(row[2]));
+      if (!/^\d{4}-\d{4}$/.test(year) || !toets || !Number.isFinite(score)) continue;
+      out.push({ toets, year, score });
+    }
+    return out;
+  }
+  return [];
+}
+
+function parseRegionAggregate(html: string): RegionAggregate {
+  return {
+    advies: parseRegionAdviesHistory(html),
+    scores: parseRegionScoresHistory(html),
+  };
+}
+
 function parseAdviesHistory(html: string): AdviesYear[] {
   // Find the arrayToDataTable call whose first row is the schooljaar header
   // for the 6-category breakdown. There may be other arrayToDataTable calls
@@ -364,11 +492,11 @@ function saveCache(cache: Cache) {
 
 // --- Per-school orchestration ----------------------------------------------
 
-async function scrapeSchool(
+function parseSchool(
+  html: string,
   entry: OverviewEntry,
   gemeenteSlug: string
-): Promise<School> {
-  const html = await getHtml(entry.url);
+): School {
   const tables = extractTables(html);
   const { brin, vestigingsnummer } = parseBrin(html);
   const { street, postcode, city } = parseAddress(html);
@@ -377,20 +505,6 @@ async function scrapeSchool(
   const leerlingen = tables[0] ? parseLeerlingenTable(tables[0]) : [];
   const scores = tables[1] ? parseScoresTable(tables[1]) : [];
   const advies = parseAdviesHistory(html);
-
-  let lat: number | null = null;
-  let lon: number | null = null;
-  if (postcode && street) {
-    try {
-      const coords = await geocode(postcode, street);
-      if (coords) {
-        lat = coords.lat;
-        lon = coords.lon;
-      }
-    } catch {
-      // best-effort
-    }
-  }
 
   return {
     brin,
@@ -403,12 +517,32 @@ async function scrapeSchool(
     denominatie,
     buurt,
     buurtSlug,
-    lat,
-    lon,
+    lat: null,
+    lon: null,
     leerlingen,
     scores,
     advies,
   };
+}
+
+async function fetchAndParseSchool(
+  entry: OverviewEntry,
+  gemeenteSlug: string
+): Promise<{ school: School; html: string }> {
+  const html = await getHtml(entry.url);
+  const school = parseSchool(html, entry, gemeenteSlug);
+  if (school.postcode && school.street) {
+    try {
+      const coords = await geocode(school.postcode, school.street);
+      if (coords) {
+        school.lat = coords.lat;
+        school.lon = coords.lon;
+      }
+    } catch {
+      // best-effort
+    }
+  }
+  return { school, html };
 }
 
 type IndexEntry = {
@@ -422,40 +556,49 @@ type IndexEntry = {
 };
 
 async function processGemeente(gemeente: string, cache: Cache): Promise<void> {
-  console.log(`\n=== ${gemeente} ===`);
+  console.log(`\n${pc.bold(pc.cyan(`■ ${gemeente}`))}`);
   const overviewUrl = `${ALLECIJFERS}/basisscholen-overzicht/${gemeente}/`;
   const overviewHtml = await getHtml(overviewUrl);
   const entries = parseOverview(overviewHtml);
-  console.log(`  ${entries.length} schools on overview`);
+  console.log(`  ${pc.dim(`${entries.length} schools on overview`)}`);
 
   const dir = path.join(OUT_DIR, gemeente);
   fs.mkdirSync(dir, { recursive: true });
 
   const index: IndexEntry[] = [];
+  let lastHtml: string | null = null;
   let cached = 0;
   let fresh = 0;
   let failed = 0;
+  const total = entries.length;
+  const pad = String(total).length;
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
+    const counter = pc.dim(`[${String(i + 1).padStart(pad)}/${total}]`);
     let school: School | undefined = cache[entry.url];
     if (school) {
       cached++;
+      console.log(`  ${counter} ${pc.gray("CACHE")} ${entry.name}`);
     } else {
+      const start = Date.now();
       try {
-        school = await scrapeSchool(entry, gemeente);
+        const result = await fetchAndParseSchool(entry, gemeente);
+        school = result.school;
+        lastHtml = result.html;
         cache[entry.url] = school;
         fresh++;
+        const ms = Date.now() - start;
+        console.log(
+          `  ${counter} ${pc.green("FETCH")} ${entry.name} ${pc.dim(`(${ms}ms)`)}`
+        );
       } catch (err) {
         failed++;
-        console.warn(`  ! ${entry.url}: ${String(err)}`);
-      }
-      if (fresh > 0 && fresh % 25 === 0) {
-        saveCache(cache);
-        console.log(
-          `  ${i + 1}/${entries.length} (cached: ${cached}, fresh: ${fresh}, failed: ${failed})`
+        console.warn(
+          `  ${counter} ${pc.red("FAIL ")} ${entry.name} ${pc.dim(String(err))}`
         );
       }
+      if (fresh > 0 && fresh % 25 === 0) saveCache(cache);
       await sleep(REQUEST_DELAY_MS);
     }
     if (!school) continue;
@@ -472,11 +615,56 @@ async function processGemeente(gemeente: string, cache: Cache): Promise<void> {
     });
   }
   saveCache(cache);
-
   fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(index));
+
+  void lastHtml; // no longer needed for averages
+
+  // Gemeente + Nederland aggregates: fetched from /basisscholen/gemeente-<x>/
+  // and /basisscholen/nederland/. Single fetch per gemeente plus one global
+  // fetch per run (the Nederland page is fetched lazily and reused across
+  // gemeenten — see fetchNederlandAggregate in main()).
+  try {
+    const gemeenteUrl = `${ALLECIJFERS}/basisscholen/gemeente-${gemeente}/`;
+    console.log(`  ${pc.dim(`gemeente aggregates: ${gemeenteUrl}`)}`);
+    const gemeenteHtml = await getHtml(gemeenteUrl);
+    await sleep(REQUEST_DELAY_MS);
+    const nederland = await getNederlandAggregate();
+    const gemeenteName =
+      GEMEENTE_DISPLAY_NAMES[gemeente] ??
+      gemeente.charAt(0).toUpperCase() + gemeente.slice(1);
+    const averages: GemeenteAverages = {
+      gemeente: { name: gemeenteName, ...parseRegionAggregate(gemeenteHtml) },
+      nederland,
+    };
+    fs.writeFileSync(path.join(dir, "averages.json"), JSON.stringify(averages));
+    console.log(
+      `  ${pc.dim(
+        `averages: gemeente ${averages.gemeente.advies.length}y advies/${averages.gemeente.scores.length} scores · nederland ${nederland.advies.length}y advies/${nederland.scores.length} scores`
+      )}`
+    );
+  } catch (err) {
+    console.warn(
+      `  ${pc.yellow("WARN")} could not build averages.json: ${String(err)}`
+    );
+  }
+
   console.log(
-    `  → ${dir}/  (${index.length} schools, ${index.length + 1} files) [cached: ${cached}, fresh: ${fresh}, failed: ${failed}]`
+    `  ${pc.bold("done")}  ${pc.green(`${index.length} schools`)}` +
+      `  ${pc.gray(`cached:${cached}`)} ${pc.green(`fresh:${fresh}`)}` +
+      (failed ? ` ${pc.red(`failed:${failed}`)}` : "")
   );
+}
+
+// Fetched once per script run, reused across all gemeenten.
+let nederlandAggregateMemo: RegionAggregate | null = null;
+async function getNederlandAggregate(): Promise<RegionAggregate> {
+  if (nederlandAggregateMemo) return nederlandAggregateMemo;
+  const url = `${ALLECIJFERS}/basisscholen/nederland/`;
+  console.log(`  ${pc.dim(`nederland aggregates: ${url}`)}`);
+  const html = await getHtml(url);
+  await sleep(REQUEST_DELAY_MS);
+  nederlandAggregateMemo = parseRegionAggregate(html);
+  return nederlandAggregateMemo;
 }
 
 async function main() {
@@ -486,7 +674,7 @@ async function main() {
   for (const g of gemeenten) {
     await processGemeente(g, cache);
   }
-  console.log("\nDone.");
+  console.log(`\n${pc.bold(pc.green("Done."))}`);
 }
 
 main().catch((err) => {
