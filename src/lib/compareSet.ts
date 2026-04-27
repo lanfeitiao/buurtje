@@ -98,3 +98,14 @@ function notifyChange(): void {
     // silent
   }
 }
+
+export const COMPARE_PALETTE = [
+  "#E65100", // brand orange
+  "#FF8A65", // peach
+  "#90CAF9", // light blue
+  "#A5D6A7", // sage green
+];
+
+export function getCompareColor(index: number): string {
+  return COMPARE_PALETTE[index % COMPARE_PALETTE.length];
+}
