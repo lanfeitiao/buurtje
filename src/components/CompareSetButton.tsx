@@ -37,7 +37,7 @@ export default function CompareSetButton({
           borderColor: "#FFCCBC",
         }}
       >
-        ✓ Added — remove
+        − Remove from compare
       </button>
     );
   }

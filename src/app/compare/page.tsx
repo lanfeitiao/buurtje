@@ -41,12 +41,31 @@ function familiesWithKidsPercent(d: PostcodeData): number | null {
   return sum > 0 ? (hc.withKids / sum) * 100 : null;
 }
 
-function ownershipPercents(d: PostcodeData): { koop: number; huur: number } | null {
+// Returns the koop share as a percentage (huur is implicit: 100 - value).
+function koopPercent(d: PostcodeData): number | null {
   const o = d.housingTypes?.ownership;
   if (!o) return null;
   const total = o.koop + o.huur;
   if (total === 0) return null;
-  return { koop: (o.koop / total) * 100, huur: (o.huur / total) * 100 };
+  return (o.koop / total) * 100;
+}
+
+// Returns the huis share as a percentage (appartement is implicit: 100 - value).
+function huisPercent(d: PostcodeData): number | null {
+  const map = d.housingTypes?.buildingType;
+  if (!map) return null;
+  const huis = map.huis ?? 0;
+  const appartement = map.appartement ?? 0;
+  const total = huis + appartement;
+  if (total === 0) return null;
+  return (huis / total) * 100;
+}
+
+// Stat-table format for "this side / the other side" where the values
+// are complementary parts of 100%.
+function formatRatio(n: number): string {
+  const a = Math.round(n);
+  return `${a} / ${100 - a}`;
 }
 
 function distanceInMeters(d: { distance: number; unit: string }): number | null {
@@ -54,18 +73,6 @@ function distanceInMeters(d: { distance: number; unit: string }): number | null 
   // existing scrape uses "m" for meters and "km" for kilometers
   if (d.unit === "km") return d.distance * 1000;
   return d.distance;
-}
-
-function buildingTypePercents(d: PostcodeData): Record<string, number> | null {
-  const map = d.housingTypes?.buildingType;
-  if (!map) return null;
-  const total = Object.values(map).reduce((sum, v) => sum + v, 0);
-  if (total === 0) return null;
-  const out: Record<string, number> = {};
-  for (const [name, count] of Object.entries(map)) {
-    out[name] = (count / total) * 100;
-  }
-  return out;
 }
 
 async function fetchOne(entry: CompareEntry): Promise<PostcodeData | null> {
@@ -152,26 +159,6 @@ export default function ComparePage() {
     status: r.status,
   }));
 
-  // Per-buurt percentages keyed by building-type name. Computed once so
-  // both the row generator and the union calculation share the same view.
-  const buildingTypePcts = resolutions.map((r) =>
-    r.data ? buildingTypePercents(r.data) : null
-  );
-  // Union of building-type names across selected buurts, ordered by total
-  // share (largest combined % first) so the most-common types appear first.
-  const buildingTypeOrder = (() => {
-    const totals = new Map<string, number>();
-    for (const pcts of buildingTypePcts) {
-      if (!pcts) continue;
-      for (const [name, pct] of Object.entries(pcts)) {
-        totals.set(name, (totals.get(name) ?? 0) + pct);
-      }
-    }
-    return [...totals.keys()].sort(
-      (a, b) => (totals.get(b) ?? 0) - (totals.get(a) ?? 0)
-    );
-  })();
-
   const statSections: StatSection[] = [
     {
       heading: "Quick stats",
@@ -206,23 +193,17 @@ export default function ComparePage() {
       heading: "Housing",
       rows: [
         {
-          label: "Owner-occupied (koop)",
-          values: resolutions.map((r) => (r.data ? ownershipPercents(r.data)?.koop ?? null : null)),
-          format: formatPercent,
+          label: "Ownership (koop / huur)",
+          values: resolutions.map((r) => (r.data ? koopPercent(r.data) : null)),
+          format: formatRatio,
           direction: "higher",
         },
         {
-          label: "Rental (huur)",
-          values: resolutions.map((r) => (r.data ? ownershipPercents(r.data)?.huur ?? null : null)),
-          format: formatPercent,
-          direction: "none",
+          label: "Building type (huis / appartement)",
+          values: resolutions.map((r) => (r.data ? huisPercent(r.data) : null)),
+          format: formatRatio,
+          direction: "higher",
         },
-        ...buildingTypeOrder.map((name) => ({
-          label: name,
-          values: buildingTypePcts.map((pcts) => pcts?.[name] ?? null),
-          format: formatPercent,
-          direction: "none" as const,
-        })),
       ],
     },
     {
@@ -289,7 +270,11 @@ export default function ComparePage() {
         ) : (
           <p className="mt-1 text-xs text-gray-500">
             {entries.length} of 4 selected ·{" "}
-            <Link href="/" className="font-semibold" style={{ color: "#E65100" }}>
+            <Link
+              href="/history?compare=1"
+              className="font-semibold"
+              style={{ color: "#E65100" }}
+            >
               + Add another
             </Link>
             {" · "}
@@ -303,16 +288,6 @@ export default function ComparePage() {
           </p>
         )}
       </div>
-
-      {entries.length === 1 && (
-        <p className="mb-4 rounded-lg border border-orange-100 bg-orange-50 px-4 py-2 text-xs text-orange-800">
-          Add another buurt from the{" "}
-          <Link href="/" className="font-semibold underline">
-            home page
-          </Link>{" "}
-          to compare side-by-side.
-        </p>
-      )}
 
       {entries.length > 0 && (
         <div className="rounded-xl border border-gray-100 bg-white p-5">
