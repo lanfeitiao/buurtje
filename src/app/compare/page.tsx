@@ -13,7 +13,6 @@ import CompareStatTable, {
 } from "@/components/CompareStatTable";
 import CompareElectionChart from "@/components/CompareElectionChart";
 import CompareMigrationChart from "@/components/CompareMigrationChart";
-import CompareHousingTypesChart from "@/components/CompareHousingTypesChart";
 
 type Resolution = {
   entry: CompareEntry;
@@ -55,6 +54,18 @@ function distanceInMeters(d: { distance: number; unit: string }): number | null 
   // existing scrape uses "m" for meters and "km" for kilometers
   if (d.unit === "km") return d.distance * 1000;
   return d.distance;
+}
+
+function buildingTypePercents(d: PostcodeData): Record<string, number> | null {
+  const map = d.housingTypes?.buildingType;
+  if (!map) return null;
+  const total = Object.values(map).reduce((sum, v) => sum + v, 0);
+  if (total === 0) return null;
+  const out: Record<string, number> = {};
+  for (const [name, count] of Object.entries(map)) {
+    out[name] = (count / total) * 100;
+  }
+  return out;
 }
 
 async function fetchOne(entry: CompareEntry): Promise<PostcodeData | null> {
@@ -141,6 +152,26 @@ export default function ComparePage() {
     status: r.status,
   }));
 
+  // Per-buurt percentages keyed by building-type name. Computed once so
+  // both the row generator and the union calculation share the same view.
+  const buildingTypePcts = resolutions.map((r) =>
+    r.data ? buildingTypePercents(r.data) : null
+  );
+  // Union of building-type names across selected buurts, ordered by total
+  // share (largest combined % first) so the most-common types appear first.
+  const buildingTypeOrder = (() => {
+    const totals = new Map<string, number>();
+    for (const pcts of buildingTypePcts) {
+      if (!pcts) continue;
+      for (const [name, pct] of Object.entries(pcts)) {
+        totals.set(name, (totals.get(name) ?? 0) + pct);
+      }
+    }
+    return [...totals.keys()].sort(
+      (a, b) => (totals.get(b) ?? 0) - (totals.get(a) ?? 0)
+    );
+  })();
+
   const statSections: StatSection[] = [
     {
       heading: "Quick stats",
@@ -186,6 +217,12 @@ export default function ComparePage() {
           format: formatPercent,
           direction: "none",
         },
+        ...buildingTypeOrder.map((name) => ({
+          label: name,
+          values: buildingTypePcts.map((pcts) => pcts?.[name] ?? null),
+          format: formatPercent,
+          direction: "none" as const,
+        })),
       ],
     },
     {
@@ -303,13 +340,6 @@ export default function ComparePage() {
             }))}
           />
           <CompareMigrationChart
-            columns={resolutions.map((r, i) => ({
-              entry: r.entry,
-              color: getCompareColor(i),
-              data: r.data,
-            }))}
-          />
-          <CompareHousingTypesChart
             columns={resolutions.map((r, i) => ({
               entry: r.entry,
               color: getCompareColor(i),
