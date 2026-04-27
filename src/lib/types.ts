@@ -49,3 +49,10 @@ export type HistoryEntry = {
   kind: "postcode" | "buurt" | "wijk";
   timestamp: number;
 };
+
+export type CompareEntry = {
+  query: string;
+  label: string;
+  kind: "postcode" | "buurt" | "wijk";
+  addedAt: number;
+};
