@@ -556,6 +556,12 @@ type IndexEntry = {
   denominatie: string | null;
   buurt: string | null;
   buurtSlug: string | null;
+  // Most recent year's stats, sliced from the per-school history arrays so
+  // the table can render without loading every per-school file. Null when
+  // the school has no data for that field.
+  latestLeerlingen: number | null;
+  latestScore: ScoreYear | null;
+  latestAdvies: AdviesYear | null;
 };
 
 async function processGemeente(gemeente: string, cache: Cache): Promise<void> {
@@ -615,6 +621,9 @@ async function processGemeente(gemeente: string, cache: Cache): Promise<void> {
       denominatie: school.denominatie,
       buurt: school.buurt,
       buurtSlug: school.buurtSlug,
+      latestLeerlingen: school.leerlingen[0]?.count ?? null,
+      latestScore: school.scores[0] ?? null,
+      latestAdvies: school.advies[0] ?? null,
     });
   }
   saveCache(cache);
