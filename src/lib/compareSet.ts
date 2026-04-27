@@ -23,10 +23,18 @@ export function readCompareSet(): CompareEntry[] {
   }
 }
 
+function normalize(query: string): string {
+  return query.trim().toLowerCase();
+}
+
 export function addToCompareSet(entry: CompareEntry): void {
   if (!hasStorage()) return;
   try {
+    const norm = normalize(entry.query);
     const current = readCompareSet();
+    if (current.some((e) => normalize(e.query) === norm)) {
+      return; // no-op on dedupe — do not reorder, do not update addedAt
+    }
     const next = [...current, entry];
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {

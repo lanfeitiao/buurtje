@@ -52,4 +52,19 @@ describe("compareSet", () => {
   test("readCompareSet returns [] when nothing has been written", () => {
     expect(readCompareSet()).toEqual([]);
   });
+
+  test("addToCompareSet is a no-op when the normalized query already exists", () => {
+    addToCompareSet({ query: "De Pijp", label: "L1", kind: "buurt", addedAt: 1000 });
+    addToCompareSet({ query: "Centrum", label: "L2", kind: "buurt", addedAt: 2000 });
+    addToCompareSet({ query: "  de pijp  ", label: "L1-NEW", kind: "buurt", addedAt: 3000 });
+
+    const entries = readCompareSet();
+    expect(entries).toHaveLength(2);
+    // Original De Pijp entry should be unchanged: same label, same addedAt
+    const dePijp = entries.find((e) => e.query === "De Pijp");
+    expect(dePijp?.label).toBe("L1");
+    expect(dePijp?.addedAt).toBe(1000);
+    // Insertion order preserved: De Pijp first, Centrum second
+    expect(entries.map((e) => e.query)).toEqual(["De Pijp", "Centrum"]);
+  });
 });
