@@ -20,7 +20,9 @@ interface SchoolsMapProps {
   schools: SchoolIndexEntry[] | null;
   selectedBuurtKeys: Set<string>;
   onBuurtToggle: (key: string) => void;
-  lowScoreSlugs: Set<string>;
+  // Schools to render with the muted icon variant (no score, below gemeente
+  // avg, or filtered out by the denominatie picker).
+  mutedSlugs: Set<string>;
 }
 
 const STYLE_DEFAULT = {
@@ -44,7 +46,7 @@ export default function SchoolsMap({
   schools,
   selectedBuurtKeys,
   onBuurtToggle,
-  lowScoreSlugs,
+  mutedSlugs,
 }: SchoolsMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
@@ -104,7 +106,7 @@ export default function SchoolsMap({
           const buurt = s.buurt
             ? `<br/><span style="color:#999;font-size:0.85em">${s.buurt}</span>`
             : "";
-          const icon = lowScoreSlugs.has(s.slug) ? iconLow : iconDefault;
+          const icon = mutedSlugs.has(s.slug) ? iconLow : iconDefault;
           L.marker([s.lat, s.lon], { icon })
             .addTo(map)
             .bindPopup(`<strong>${s.name}</strong>${denom}${buurt}`);
@@ -122,7 +124,7 @@ export default function SchoolsMap({
         buurtenLayerRef.current = null;
       }
     };
-  }, [buurten, schools, lowScoreSlugs]);
+  }, [buurten, schools, mutedSlugs]);
 
   // Re-style polygons when the selection changes — without rebuilding the map.
   useEffect(() => {
@@ -148,7 +150,7 @@ export default function SchoolsMap({
           <span className="area-map-pin area-map-pin--school area-map-pin--school-low inline-block leading-none">
             🏫
           </span>
-          <span className="text-gray-700">No / below-avg score</span>
+          <span className="text-gray-700">Muted (no score / below avg / filtered)</span>
         </div>
       </div>
     </div>

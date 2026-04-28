@@ -1,4 +1,15 @@
-import type { SchoolIndexEntry, SchoolScore } from "./types";
+import type { SchoolAdvies, SchoolIndexEntry, SchoolScore } from "./types";
+
+// VWO% rounded to whole percent. Null when there's no advies row to read or
+// when the row sums to zero (no graduates that year — happens for schools
+// with very small or special-needs cohorts).
+export function vwoPercent(a: SchoolAdvies | null): number | null {
+  if (!a) return null;
+  const total =
+    a.speciaal_praktijk + a.vmbo_b_k + a.vmbo_t + a.havo + a.vwo + a.overig;
+  if (total === 0) return null;
+  return Math.round((a.vwo / total) * 100);
+}
 
 // "Low scoring" = no published latest score, OR the school's latest score
 // is strictly below the gemeente average for the same toets and year.
