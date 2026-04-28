@@ -4,7 +4,10 @@ import type { SchoolIndexEntry, SchoolAdvies } from "@/lib/types";
 
 interface SchoolsTableProps {
   schools: SchoolIndexEntry[] | null;
-  lowScoreSlugs: Set<string>;
+  // Schools whose latest score is strictly below the gemeente average. Used
+  // to highlight the Score cell — schools without any score are not in this
+  // set (no value to compare to).
+  belowAverageSlugs: Set<string>;
 }
 
 function vwoPercent(a: SchoolAdvies | null): number | null {
@@ -17,7 +20,7 @@ function vwoPercent(a: SchoolAdvies | null): number | null {
 
 export default function SchoolsTable({
   schools,
-  lowScoreSlugs,
+  belowAverageSlugs,
 }: SchoolsTableProps) {
   if (schools === null) {
     return (
@@ -53,12 +56,12 @@ export default function SchoolsTable({
             <tbody className="divide-y divide-gray-100">
               {schools.map((s) => {
                 const vwo = vwoPercent(s.latestAdvies);
-                const isLow = lowScoreSlugs.has(s.slug);
+                const isBelow = belowAverageSlugs.has(s.slug);
                 return (
                   <tr
                     key={s.slug}
                     className={
-                      isLow
+                      isBelow
                         ? "bg-red-50 hover:bg-red-100"
                         : "hover:bg-gray-50"
                     }
@@ -83,11 +86,20 @@ export default function SchoolsTable({
                     <td className="px-4 py-2 text-right tabular-nums text-gray-700">
                       {s.latestLeerlingen ?? "—"}
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-gray-700">
+                    <td
+                      className={`px-4 py-2 text-right tabular-nums ${
+                        isBelow ? "bg-red-100 text-red-900" : "text-gray-700"
+                      }`}
+                      title={isBelow ? "Below gemeente average" : undefined}
+                    >
                       {s.latestScore ? (
                         <>
                           {s.latestScore.score}{" "}
-                          <span className="text-xs text-gray-400">
+                          <span
+                            className={`text-xs ${
+                              isBelow ? "text-red-700" : "text-gray-400"
+                            }`}
+                          >
                             {s.latestScore.toets}
                           </span>
                         </>

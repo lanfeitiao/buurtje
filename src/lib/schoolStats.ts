@@ -12,6 +12,17 @@ export function isLowScoring(
   gemeenteScores: SchoolScore[]
 ): boolean {
   if (!school.latestScore) return true;
+  return isBelowAverage(school, gemeenteScores);
+}
+
+// Strictly "below the gemeente average" — requires a published score AND a
+// matching gemeente baseline. Excludes the no-score case so it can be used
+// for treatments that imply a numeric comparison (e.g. "lower than average").
+export function isBelowAverage(
+  school: SchoolIndexEntry,
+  gemeenteScores: SchoolScore[]
+): boolean {
+  if (!school.latestScore) return false;
   const { toets, year, score } = school.latestScore;
   const baseline = gemeenteScores.find(
     (g) => g.toets === toets && g.year === year

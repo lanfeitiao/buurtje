@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SchoolsMap from "@/components/SchoolsMap";
 import SchoolsTable from "@/components/SchoolsTable";
 import { buurtKey } from "@/lib/mapHelpers";
-import { isLowScoring } from "@/lib/schoolStats";
+import { isBelowAverage, isLowScoring } from "@/lib/schoolStats";
 import type { SchoolIndexEntry, SchoolScore } from "@/lib/types";
 
 type GemeenteAverages = {
@@ -108,12 +108,20 @@ function SchoolsPageContent() {
     );
   }, [schools, selectedBuurtKeys]);
 
-  // Slugs of schools to flag as "low scoring" — no published score, or
-  // strictly below the gemeente average for the same toets+year.
+  // `lowScoreSlugs`: no published score OR below gemeente average — used to
+  // grey out the map marker. `belowAverageSlugs`: strictly below gemeente
+  // average (excludes no-score) — used for the score-cell highlight in the
+  // table, since "lower than average" implies a numeric comparison.
   const lowScoreSlugs = useMemo(() => {
     if (!schools) return new Set<string>();
     return new Set(
       schools.filter((s) => isLowScoring(s, gemeenteScores)).map((s) => s.slug)
+    );
+  }, [schools, gemeenteScores]);
+  const belowAverageSlugs = useMemo(() => {
+    if (!schools) return new Set<string>();
+    return new Set(
+      schools.filter((s) => isBelowAverage(s, gemeenteScores)).map((s) => s.slug)
     );
   }, [schools, gemeenteScores]);
 
@@ -189,7 +197,10 @@ function SchoolsPageContent() {
             onBuurtToggle={toggleBuurt}
             lowScoreSlugs={lowScoreSlugs}
           />
-          <SchoolsTable schools={filteredSchools} lowScoreSlugs={lowScoreSlugs} />
+          <SchoolsTable
+            schools={filteredSchools}
+            belowAverageSlugs={belowAverageSlugs}
+          />
         </div>
       )}
     </main>
