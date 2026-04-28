@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { SchoolIndexEntry } from "@/lib/types";
 import { vwoPercent } from "@/lib/schoolStats";
 
@@ -51,62 +52,32 @@ export default function SchoolsTable({
   const denomFilterActive =
     selectedDenominaties !== null &&
     selectedDenominaties.size !== availableDenominaties.length;
-  const sortIndicator =
-    sort?.col === "vwo" ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
+  const sortActive = sort?.col === "vwo";
+  const sortGlyph = !sortActive ? "↕" : sort.dir === "desc" ? "↓" : "↑";
+
+  // Close the denominatie dropdown when the user clicks outside it. <details>
+  // only closes via its own summary by default; this brings it in line with
+  // typical popover behavior.
+  const denomDetailsRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      const el = denomDetailsRef.current;
+      if (!el || !el.open) return;
+      if (!el.contains(e.target as Node)) {
+        el.open = false;
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, []);
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
-      <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-3">
+      <div className="border-b border-gray-100 px-5 py-3">
         <h2 className="text-sm font-semibold text-gray-700">
           Schools{" "}
           <span className="font-normal text-gray-400">({schools.length})</span>
         </h2>
-        <details className="relative">
-          <summary
-            className={`cursor-pointer list-none rounded-md border px-3 py-1 text-xs ${
-              denomFilterActive
-                ? "border-orange-300 bg-orange-50 text-orange-700"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Denominatie
-            {denomFilterActive
-              ? ` (${selectedDenominaties!.size}/${availableDenominaties.length})`
-              : ""}{" "}
-            ▾
-          </summary>
-          <div className="absolute right-0 z-10 mt-1 max-h-72 w-64 overflow-auto rounded-md border border-gray-200 bg-white p-2 text-sm shadow-lg">
-            <div className="mb-1 flex justify-between border-b border-gray-100 pb-2 text-xs">
-              <button
-                type="button"
-                onClick={onSelectAllDenominaties}
-                className="text-gray-600 hover:underline"
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                onClick={onClearAllDenominaties}
-                className="text-gray-600 hover:underline"
-              >
-                Clear all
-              </button>
-            </div>
-            {availableDenominaties.map((d) => (
-              <label
-                key={d}
-                className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-gray-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={isDenomChecked(selectedDenominaties, d)}
-                  onChange={() => onToggleDenominatie(d)}
-                />
-                <span className="text-gray-700">{d}</span>
-              </label>
-            ))}
-          </div>
-        </details>
       </div>
       {schools.length === 0 ? (
         <p className="p-5 text-sm text-gray-400">No schools to show.</p>
@@ -117,17 +88,75 @@ export default function SchoolsTable({
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Name</th>
                 <th className="px-4 py-2 text-left font-medium">Buurt</th>
-                <th className="px-4 py-2 text-left font-medium">Denominatie</th>
+                <th className="px-4 py-2 text-left font-medium">
+                  <details ref={denomDetailsRef} className="relative inline-block">
+                    <summary
+                      className={`-mx-1 inline-flex cursor-pointer list-none items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-gray-200 ${
+                        denomFilterActive
+                          ? "text-orange-600"
+                          : "text-gray-500"
+                      }`}
+                      title="Click to filter"
+                    >
+                      Denominatie
+                      {denomFilterActive
+                        ? ` (${selectedDenominaties!.size}/${availableDenominaties.length})`
+                        : ""}{" "}
+                      <span aria-hidden>▾</span>
+                    </summary>
+                    <div className="absolute left-0 z-10 mt-1 max-h-72 w-64 overflow-auto rounded-md border border-gray-200 bg-white p-2 text-sm normal-case tracking-normal shadow-lg">
+                      <div className="mb-1 flex justify-between border-b border-gray-100 pb-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={onSelectAllDenominaties}
+                          className="text-gray-600 hover:underline"
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onClearAllDenominaties}
+                          className="text-gray-600 hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      {availableDenominaties.map((d) => (
+                        <label
+                          key={d}
+                          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isDenomChecked(selectedDenominaties, d)}
+                            onChange={() => onToggleDenominatie(d)}
+                          />
+                          <span className="text-gray-700">{d}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                </th>
                 <th className="px-4 py-2 text-right font-medium">Leerlingen</th>
                 <th className="px-4 py-2 text-right font-medium">Score</th>
                 <th className="px-4 py-2 text-right font-medium">
                   <button
                     type="button"
                     onClick={() => onCycleSort("vwo")}
-                    className="ml-auto inline-flex items-center text-xs uppercase tracking-wide text-gray-500 hover:text-gray-700"
+                    className={`-mx-1 ml-auto inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs uppercase tracking-wide transition-colors hover:bg-gray-200 ${
+                      sortActive ? "text-orange-600" : "text-gray-500"
+                    }`}
                     title="Click to sort"
                   >
-                    VWO%{sortIndicator}
+                    VWO%
+                    <span
+                      aria-hidden
+                      className={
+                        sortActive ? "text-orange-600" : "text-gray-400"
+                      }
+                    >
+                      {sortGlyph}
+                    </span>
                   </button>
                 </th>
               </tr>
