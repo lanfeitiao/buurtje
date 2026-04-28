@@ -4,9 +4,9 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SchoolsMap from "@/components/SchoolsMap";
-import SchoolsTable from "@/components/SchoolsTable";
+import SchoolsTable, { type SortState } from "@/components/SchoolsTable";
 import { buurtKey } from "@/lib/mapHelpers";
-import { isBelowAverage, isLowScoring } from "@/lib/schoolStats";
+import { isBelowAverage, isLowScoring, vwoPercent } from "@/lib/schoolStats";
 import type { SchoolIndexEntry, SchoolScore } from "@/lib/types";
 
 type GemeenteAverages = {
@@ -43,6 +43,24 @@ function SchoolsPageContent() {
       ),
     [buurtenParam]
   );
+
+  // Sort: only VWO% supported today; null param means "default order".
+  const sortParam = searchParams.get("sort");
+  const dirParam = searchParams.get("dir");
+  const sort: SortState =
+    sortParam === "vwo"
+      ? { col: "vwo", dir: dirParam === "asc" ? "asc" : "desc" }
+      : null;
+
+  // Denominatie filter:
+  //   no `denominaties` param      → null = no filter (show all)
+  //   `?denominaties=A,B`          → only those values shown
+  //   `?denominaties=` (empty)     → empty Set = nothing shown
+  const denomParam = searchParams.get("denominaties");
+  const selectedDenominaties = useMemo<Set<string> | null>(() => {
+    if (denomParam === null) return null;
+    return new Set(denomParam.split(",").filter(Boolean));
+  }, [denomParam]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,7 +101,7 @@ function SchoolsPageContent() {
     // Switching gemeente clears the buurt selection — slugs from the previous
     // gemeente wouldn't match anything in the new one anyway.
     params.delete("buurten");
-    router.replace(`/schools?${params.toString()}`);
+    router.replace(`/schools?${params.toString()}`, { scroll: false });
   }
 
   const toggleBuurt = useCallback(
@@ -94,24 +112,117 @@ function SchoolsPageContent() {
       const params = new URLSearchParams(searchParams.toString());
       if (next.size) params.set("buurten", [...next].sort().join(","));
       else params.delete("buurten");
-      router.replace(`/schools?${params.toString()}`);
+      router.replace(`/schools?${params.toString()}`, { scroll: false });
     },
     [selectedBuurtKeys, searchParams, router]
   );
 
-  // Schools shown in the table: filtered by selection, or all when empty.
+  // Available denominaties for the filter dropdown — derived from the loaded
+  // gemeente, sorted alphabetically. Stable across buurt selection so the
+  // dropdown doesn't appear/disappear options as the user clicks polygons.
+  const availableDenominaties = useMemo(() => {
+    if (!schools) return [];
+    return Array.from(
+      new Set(schools.map((s) => s.denominatie).filter((d): d is string => !!d))
+    ).sort();
+  }, [schools]);
+
+  const cycleSort = useCallback(
+    (col: "vwo") => {
+      const params = new URLSearchParams(searchParams.toString());
+      // Cycle: none → desc → asc → none
+      if (sort === null || sort.col !== col) {
+        params.set("sort", col);
+        params.set("dir", "desc");
+      } else if (sort.dir === "desc") {
+        params.set("sort", col);
+        params.set("dir", "asc");
+      } else {
+        params.delete("sort");
+        params.delete("dir");
+      }
+      router.replace(`/schools?${params.toString()}`, { scroll: false });
+    },
+    [sort, searchParams, router]
+  );
+
+  const setDenominatiesParam = useCallback(
+    (next: Set<string> | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next === null) {
+        params.delete("denominaties");
+      } else {
+        params.set("denominaties", [...next].sort().join(","));
+      }
+      router.replace(`/schools?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router]
+  );
+
+  const toggleDenominatie = useCallback(
+    (denom: string) => {
+      // If no current filter (null), behave as if all are checked — toggling
+      // means unchecking this one only.
+      const current =
+        selectedDenominaties ?? new Set(availableDenominaties);
+      const next = new Set(current);
+      if (next.has(denom)) next.delete(denom);
+      else next.add(denom);
+      // Collapse "all selected" back to null (no filter) for a clean URL.
+      const allSelected =
+        next.size === availableDenominaties.length &&
+        availableDenominaties.every((d) => next.has(d));
+      setDenominatiesParam(allSelected ? null : next);
+    },
+    [selectedDenominaties, availableDenominaties, setDenominatiesParam]
+  );
+
+  const selectAllDenominaties = useCallback(
+    () => setDenominatiesParam(null),
+    [setDenominatiesParam]
+  );
+  const clearAllDenominaties = useCallback(
+    () => setDenominatiesParam(new Set()),
+    [setDenominatiesParam]
+  );
+
+  // Schools shown in the table: apply buurt filter → denom filter → sort.
   const filteredSchools = useMemo(() => {
     if (!schools) return null;
-    if (selectedBuurtKeys.size === 0) return schools;
-    return schools.filter(
-      (s) => s.buurt != null && selectedBuurtKeys.has(buurtKey(s.buurt))
-    );
-  }, [schools, selectedBuurtKeys]);
+    let list: SchoolIndexEntry[] = schools;
 
-  // `lowScoreSlugs`: no published score OR below gemeente average — used to
-  // grey out the map marker. `belowAverageSlugs`: strictly below gemeente
-  // average (excludes no-score) — used for the score-cell highlight in the
-  // table, since "lower than average" implies a numeric comparison.
+    if (selectedBuurtKeys.size > 0) {
+      list = list.filter(
+        (s) => s.buurt != null && selectedBuurtKeys.has(buurtKey(s.buurt))
+      );
+    }
+
+    if (selectedDenominaties !== null) {
+      list = list.filter(
+        (s) => s.denominatie != null && selectedDenominaties.has(s.denominatie)
+      );
+    }
+
+    if (sort?.col === "vwo") {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        const va = vwoPercent(a.latestAdvies);
+        const vb = vwoPercent(b.latestAdvies);
+        // Schools with no VWO% always sort to the end, regardless of dir.
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        return (va - vb) * dir;
+      });
+    }
+
+    return list;
+  }, [schools, selectedBuurtKeys, selectedDenominaties, sort]);
+
+  // `lowScoreSlugs`: no published score OR below gemeente average — used,
+  // along with the denominatie-filtered-out set, to grey out map markers.
+  // `belowAverageSlugs`: strictly below gemeente average (excludes no-score)
+  // — used for the score-cell highlight in the table.
   const lowScoreSlugs = useMemo(() => {
     if (!schools) return new Set<string>();
     return new Set(
@@ -124,6 +235,22 @@ function SchoolsPageContent() {
       schools.filter((s) => isBelowAverage(s, gemeenteScores)).map((s) => s.slug)
     );
   }, [schools, gemeenteScores]);
+  // Schools the active denominatie filter excludes — empty when no filter.
+  const denomFilteredOutSlugs = useMemo(() => {
+    if (!schools || selectedDenominaties === null) return new Set<string>();
+    return new Set(
+      schools
+        .filter(
+          (s) => !s.denominatie || !selectedDenominaties.has(s.denominatie)
+        )
+        .map((s) => s.slug)
+    );
+  }, [schools, selectedDenominaties]);
+  // Union: any school the map should de-emphasise.
+  const mutedSlugs = useMemo(
+    () => new Set([...lowScoreSlugs, ...denomFilteredOutSlugs]),
+    [lowScoreSlugs, denomFilteredOutSlugs]
+  );
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -195,11 +322,18 @@ function SchoolsPageContent() {
             schools={schools}
             selectedBuurtKeys={selectedBuurtKeys}
             onBuurtToggle={toggleBuurt}
-            lowScoreSlugs={lowScoreSlugs}
+            mutedSlugs={mutedSlugs}
           />
           <SchoolsTable
             schools={filteredSchools}
             belowAverageSlugs={belowAverageSlugs}
+            sort={sort}
+            onCycleSort={cycleSort}
+            availableDenominaties={availableDenominaties}
+            selectedDenominaties={selectedDenominaties}
+            onToggleDenominatie={toggleDenominatie}
+            onSelectAllDenominaties={selectAllDenominaties}
+            onClearAllDenominaties={clearAllDenominaties}
           />
         </div>
       )}

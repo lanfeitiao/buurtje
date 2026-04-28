@@ -1,6 +1,9 @@
 "use client";
 
-import type { SchoolIndexEntry, SchoolAdvies } from "@/lib/types";
+import type { SchoolIndexEntry } from "@/lib/types";
+import { vwoPercent } from "@/lib/schoolStats";
+
+export type SortState = { col: "vwo"; dir: "asc" | "desc" } | null;
 
 interface SchoolsTableProps {
   schools: SchoolIndexEntry[] | null;
@@ -8,19 +11,34 @@ interface SchoolsTableProps {
   // to highlight the Score cell — schools without any score are not in this
   // set (no value to compare to).
   belowAverageSlugs: Set<string>;
+  // Sortable header state (currently only VWO%).
+  sort: SortState;
+  onCycleSort: (col: "vwo") => void;
+  // Denominatie filter — null means "no filter" (show all).
+  availableDenominaties: string[];
+  selectedDenominaties: Set<string> | null;
+  onToggleDenominatie: (denom: string) => void;
+  onSelectAllDenominaties: () => void;
+  onClearAllDenominaties: () => void;
 }
 
-function vwoPercent(a: SchoolAdvies | null): number | null {
-  if (!a) return null;
-  const total =
-    a.speciaal_praktijk + a.vmbo_b_k + a.vmbo_t + a.havo + a.vwo + a.overig;
-  if (total === 0) return null;
-  return Math.round((a.vwo / total) * 100);
+function isDenomChecked(
+  selected: Set<string> | null,
+  denom: string
+): boolean {
+  return selected === null ? true : selected.has(denom);
 }
 
 export default function SchoolsTable({
   schools,
   belowAverageSlugs,
+  sort,
+  onCycleSort,
+  availableDenominaties,
+  selectedDenominaties,
+  onToggleDenominatie,
+  onSelectAllDenominaties,
+  onClearAllDenominaties,
 }: SchoolsTableProps) {
   if (schools === null) {
     return (
@@ -30,13 +48,65 @@ export default function SchoolsTable({
     );
   }
 
+  const denomFilterActive =
+    selectedDenominaties !== null &&
+    selectedDenominaties.size !== availableDenominaties.length;
+  const sortIndicator =
+    sort?.col === "vwo" ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
-      <div className="border-b border-gray-100 px-5 py-3">
+      <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-3">
         <h2 className="text-sm font-semibold text-gray-700">
           Schools{" "}
           <span className="font-normal text-gray-400">({schools.length})</span>
         </h2>
+        <details className="relative">
+          <summary
+            className={`cursor-pointer list-none rounded-md border px-3 py-1 text-xs ${
+              denomFilterActive
+                ? "border-orange-300 bg-orange-50 text-orange-700"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Denominatie
+            {denomFilterActive
+              ? ` (${selectedDenominaties!.size}/${availableDenominaties.length})`
+              : ""}{" "}
+            ▾
+          </summary>
+          <div className="absolute right-0 z-10 mt-1 max-h-72 w-64 overflow-auto rounded-md border border-gray-200 bg-white p-2 text-sm shadow-lg">
+            <div className="mb-1 flex justify-between border-b border-gray-100 pb-2 text-xs">
+              <button
+                type="button"
+                onClick={onSelectAllDenominaties}
+                className="text-gray-600 hover:underline"
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={onClearAllDenominaties}
+                className="text-gray-600 hover:underline"
+              >
+                Clear all
+              </button>
+            </div>
+            {availableDenominaties.map((d) => (
+              <label
+                key={d}
+                className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={isDenomChecked(selectedDenominaties, d)}
+                  onChange={() => onToggleDenominatie(d)}
+                />
+                <span className="text-gray-700">{d}</span>
+              </label>
+            ))}
+          </div>
+        </details>
       </div>
       {schools.length === 0 ? (
         <p className="p-5 text-sm text-gray-400">No schools to show.</p>
@@ -50,7 +120,16 @@ export default function SchoolsTable({
                 <th className="px-4 py-2 text-left font-medium">Denominatie</th>
                 <th className="px-4 py-2 text-right font-medium">Leerlingen</th>
                 <th className="px-4 py-2 text-right font-medium">Score</th>
-                <th className="px-4 py-2 text-right font-medium">VWO%</th>
+                <th className="px-4 py-2 text-right font-medium">
+                  <button
+                    type="button"
+                    onClick={() => onCycleSort("vwo")}
+                    className="ml-auto inline-flex items-center text-xs uppercase tracking-wide text-gray-500 hover:text-gray-700"
+                    title="Click to sort"
+                  >
+                    VWO%{sortIndicator}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
