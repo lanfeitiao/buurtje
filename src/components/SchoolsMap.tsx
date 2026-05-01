@@ -107,9 +107,17 @@ export default function SchoolsMap({
             ? `<br/><span style="color:#999;font-size:0.85em">${s.buurt}</span>`
             : "";
           const icon = mutedSlugs.has(s.slug) ? iconLow : iconDefault;
+          // Link the school name in the popup to its allecijfers detail page.
+          // Inline styles because the popup HTML lives outside the React tree
+          // (Leaflet renders it raw), so Tailwind classes wouldn't apply.
+          const nameLink =
+            `<a href="https://allecijfers.nl/basisschool/${s.slug}/" ` +
+            `target="_blank" rel="noopener noreferrer" ` +
+            `style="color:#E65100;font-weight:600;text-decoration:underline;">` +
+            `${s.name}</a>`;
           L.marker([s.lat, s.lon], { icon })
             .addTo(map)
-            .bindPopup(`<strong>${s.name}</strong>${denom}${buurt}`);
+            .bindPopup(`${nameLink}${denom}${buurt}`);
         }
       }
     }
