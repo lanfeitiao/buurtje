@@ -130,6 +130,22 @@ function SchoolsPageContent() {
     ).sort();
   }, [schools]);
 
+  // key (slugified buurtnaam) → original buurtnaam from the loaded geojson.
+  // Lets the chip strip show the human-readable name and link to a search
+  // for that buurt on the home page.
+  const buurtKeyToName = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!buurten) return map;
+    for (const f of buurten.features) {
+      const name = f.properties?.buurtnaam as string | undefined;
+      if (name) map.set(buurtKey(name), name);
+    }
+    return map;
+  }, [buurten]);
+
+  const currentGemeenteLabel =
+    GEMEENTEN.find((g) => g.slug === slug)?.label ?? "";
+
   const cycleSort = useCallback(
     (col: "vwo") => {
       const params = new URLSearchParams(searchParams.toString());
@@ -299,17 +315,36 @@ function SchoolsPageContent() {
         {selectedBuurtKeys.size > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
             <span className="font-medium">Selected buurten:</span>
-            {[...selectedBuurtKeys].map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => toggleBuurt(k)}
-                className="rounded-full border border-gray-200 px-2 py-0.5 hover:bg-gray-50"
-                title="Click to remove"
-              >
-                {k} ✕
-              </button>
-            ))}
+            {[...selectedBuurtKeys].map((k) => {
+              const name = buurtKeyToName.get(k) ?? k;
+              const query = currentGemeenteLabel
+                ? `${name} ${currentGemeenteLabel}`
+                : name;
+              return (
+                <span
+                  key={k}
+                  className="inline-flex items-center overflow-hidden rounded-full border border-gray-200"
+                >
+                  <Link
+                    href={`/?q=${encodeURIComponent(query)}`}
+                    className="px-2 py-0.5 hover:bg-gray-50 hover:underline"
+                    style={{ color: "#E65100" }}
+                    title="Open this buurt"
+                  >
+                    {name}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => toggleBuurt(k)}
+                    className="border-l border-gray-200 px-1.5 py-0.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                    title="Remove from selection"
+                    aria-label={`Remove ${name}`}
+                  >
+                    ✕
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
