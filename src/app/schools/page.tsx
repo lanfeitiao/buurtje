@@ -110,7 +110,10 @@ function SchoolsPageContent() {
       if (next.has(key)) next.delete(key);
       else next.add(key);
       const params = new URLSearchParams(searchParams.toString());
-      if (next.size) params.set("buurten", [...next].sort().join(","));
+      // Preserve insertion order — JS Set keeps it, the URL string is the
+      // serialized order, and parsing back into a Set on the next render
+      // round-trips it. Newly toggled-in buurten land at the end.
+      if (next.size) params.set("buurten", [...next].join(","));
       else params.delete("buurten");
       router.replace(`/schools?${params.toString()}`, { scroll: false });
     },
@@ -296,7 +299,7 @@ function SchoolsPageContent() {
         {selectedBuurtKeys.size > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
             <span className="font-medium">Selected buurten:</span>
-            {[...selectedBuurtKeys].sort().map((k) => (
+            {[...selectedBuurtKeys].map((k) => (
               <button
                 key={k}
                 type="button"
