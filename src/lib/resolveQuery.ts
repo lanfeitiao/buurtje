@@ -37,6 +37,18 @@ function toSlug(name: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+// PDOK returns CBS-style names like "Wijk 08 Zuidwest" while allecijfers.nl
+// changed its URLs in 2024 to drop the numbered prefix (now "zuidwest-utrecht",
+// not "wijk-08-zuidwest-utrecht"). Without stripping, every Utrecht wijk hits
+// a JS-redirect notice page that scrapes as zeroes.
+export function stripCBSPrefix(name: string): string {
+  return name.replace(/^(Wijk|Buurt)\s+\d+\s+/i, "");
+}
+
+export function buildAreaSlug(name: string, gemeente: string): string {
+  return `${toSlug(stripCBSPrefix(name))}-${toSlug(gemeente)}`;
+}
+
 export type AddressPoint = { lat: number; lon: number; label: string };
 
 export type SearchResult =
@@ -117,7 +129,7 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
         "type:buurt",
         "geometrie_ll"
       );
-      const slug = `${toSlug(adresDoc.buurtnaam)}-${toSlug(adresDoc.gemeentenaam)}`;
+      const slug = buildAreaSlug(adresDoc.buurtnaam, adresDoc.gemeentenaam);
       return {
         kind: "area",
         areaType: "buurt",
@@ -159,7 +171,7 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
       const code = reverseDoc?.postcode?.substring(0, 4) ?? "0000";
       const areaType = buurtDoc.type as "buurt" | "wijk";
       const name = areaType === "buurt" ? buurtDoc.buurtnaam : buurtDoc.wijknaam;
-      const slug = `${toSlug(name)}-${toSlug(buurtDoc.gemeentenaam)}`;
+      const slug = buildAreaSlug(name, buurtDoc.gemeentenaam);
       const areaCode =
         areaType === "buurt" ? buurtDoc.buurtcode : buurtDoc.wijkcode;
       return {
