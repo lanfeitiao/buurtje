@@ -65,6 +65,7 @@ export type SearchResult =
       code: string;
       areaCode: string;
       label: string;
+      gemeente: string;            // NEW — for grouping favorites/history by city
       buurtName?: string;          // populated only on the address path
       addressPoint?: AddressPoint; // populated only on the address path
       geometrieWkt: string;
@@ -137,6 +138,7 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
         code: adresDoc.postcode.substring(0, 4),
         areaCode: adresDoc.buurtcode,
         label: adresDoc.weergavenaam,
+        gemeente: adresDoc.gemeentenaam,
         buurtName: adresDoc.buurtnaam,
         addressPoint,
         geometrieWkt: buurtDoc?.geometrie_ll ?? "",
@@ -181,6 +183,7 @@ export async function resolveQuery(query: string): Promise<SearchResult> {
         code,
         areaCode: areaCode || "",
         label: buurtDoc.weergavenaam,
+        gemeente: buurtDoc.gemeentenaam,
         geometrieWkt: buurtDoc.geometrie_ll ?? "",
       };
     }

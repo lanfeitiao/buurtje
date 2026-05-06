@@ -19,7 +19,8 @@ function isHistoryEntry(value: unknown): value is HistoryEntry {
     typeof e.query === "string" &&
     typeof e.label === "string" &&
     (e.kind === "postcode" || e.kind === "buurt" || e.kind === "wijk") &&
-    typeof e.timestamp === "number"
+    typeof e.timestamp === "number" &&
+    (e.city === undefined || typeof e.city === "string")
   );
 }
 
