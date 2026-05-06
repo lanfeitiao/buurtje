@@ -13,6 +13,10 @@ describe("cityFromResult", () => {
     test("empty string for empty input", () => {
       expect(cityFromArea({ gemeente: "" })).toBe("");
     });
+
+    test("empty string when gemeente is undefined (defensive)", () => {
+      expect(cityFromArea({ gemeente: undefined })).toBe("");
+    });
   });
 
   describe("cityFromPostcodeData", () => {
