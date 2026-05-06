@@ -45,8 +45,22 @@ export function stripCBSPrefix(name: string): string {
   return name.replace(/^(Wijk|Buurt)\s+\d+\s+/i, "");
 }
 
+// PDOK uses official CBS gemeente names; allecijfers.nl uses colloquial /
+// disambiguated forms in URLs. Without these overrides every wijk in the
+// affected gemeenten 404s and falls back to postcode data.
+const GEMEENTE_SLUG_OVERRIDES: Record<string, string> = {
+  "'s-gravenhage": "den-haag",
+  "'s-hertogenbosch": "den-bosch",
+  "bergen (l)": "bergen-limburg",
+  "bergen (nh)": "bergen-noord-holland",
+};
+
+function gemeenteSlug(gemeente: string): string {
+  return GEMEENTE_SLUG_OVERRIDES[gemeente.toLowerCase()] ?? toSlug(gemeente);
+}
+
 export function buildAreaSlug(name: string, gemeente: string): string {
-  return `${toSlug(stripCBSPrefix(name))}-${toSlug(gemeente)}`;
+  return `${toSlug(stripCBSPrefix(name))}-${gemeenteSlug(gemeente)}`;
 }
 
 export type AddressPoint = { lat: number; lon: number; label: string };
