@@ -11,6 +11,8 @@ interface HistoryListProps {
   mode?: "navigate" | "select";
   selected?: Set<string>;
   onToggle?: (query: string) => void;
+  onToggleFavorite?: (entry: HistoryEntry) => void;
+  isFavorite?: (entry: HistoryEntry) => boolean;
 }
 
 function badgeClasses(kind: HistoryEntry["kind"]): string {
@@ -25,6 +27,8 @@ export default function HistoryList({
   mode = "navigate",
   selected,
   onToggle,
+  onToggleFavorite,
+  isFavorite,
 }: HistoryListProps) {
   if (entries.length === 0) {
     return (
@@ -90,17 +94,35 @@ export default function HistoryList({
                 {entry.kind}
               </span>
             </div>
-            <button
-              type="button"
-              aria-label={`Remove ${entry.label}`}
-              className="rounded px-2 py-1 text-base text-gray-400 hover:bg-red-50 hover:text-red-700"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(entry.query);
-              }}
-            >
-              ✕
-            </button>
+            <div className="flex items-center">
+              {onToggleFavorite && isFavorite && (
+                <button
+                  type="button"
+                  aria-label={
+                    isFavorite(entry) ? `Unfavorite ${entry.label}` : `Favorite ${entry.label}`
+                  }
+                  className="rounded px-2 py-1 text-base hover:bg-orange-50"
+                  style={{ color: isFavorite(entry) ? "#E65100" : "#9CA3AF" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(entry);
+                  }}
+                >
+                  {isFavorite(entry) ? "♥" : "♡"}
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label={`Remove ${entry.label}`}
+                className="rounded px-2 py-1 text-base text-gray-400 hover:bg-red-50 hover:text-red-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(entry.query);
+                }}
+              >
+                ✕
+              </button>
+            </div>
           </li>
         );
       })}
