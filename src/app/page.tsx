@@ -15,6 +15,8 @@ import ElectionResults from "@/components/ElectionResults";
 import AreaMap from "@/components/AreaMap";
 import CompareSetChip from "@/components/CompareSetChip";
 import CompareSetButton from "@/components/CompareSetButton";
+import FavoriteButton from "@/components/FavoriteButton";
+import { cityFromArea, cityFromPostcodeData } from "@/lib/cityFromResult";
 
 function HomeContent() {
   const [data, setData] = useState<PostcodeData | null>(null);
@@ -25,6 +27,7 @@ function HomeContent() {
   const [buurtName, setBuurtName] = useState<string | null>(null);
   const [mapContext, setMapContext] = useState<MapContext | null>(null);
   const [lastQuery, setLastQuery] = useState<string>("");
+  const [city, setCity] = useState<string>("");
   const searchParams = useSearchParams();
   const autoSearchedRef = useRef(false);
 
@@ -36,6 +39,7 @@ function HomeContent() {
     setAreaType(null);
     setBuurtName(null);
     setMapContext(null);
+    setCity("");
 
     try {
       setLastQuery(query);
@@ -62,11 +66,14 @@ function HomeContent() {
         if (res.ok) {
           const json: PostcodeData = await res.json();
           setData(json);
+          const computedCity = cityFromArea(result);
+          setCity(computedCity);
           const entry: HistoryEntry = {
             query,
             label: result.label,
             kind: result.areaType,
             timestamp: Date.now(),
+            city: computedCity,
           };
           addToHistory(entry);
           return;
@@ -86,6 +93,9 @@ function HomeContent() {
             const json: PostcodeData = await fallback.json();
             setData(json);
             setMatchedLabel(`${result.label} (showing postcode ${result.code})`);
+            const computedCity =
+              cityFromArea(result) || cityFromPostcodeData(json.location);
+            setCity(computedCity);
             // Save the original area entry, not the postcode fallback —
             // history should reflect what the user searched for.
             const entry: HistoryEntry = {
@@ -93,6 +103,7 @@ function HomeContent() {
               label: result.label,
               kind: result.areaType,
               timestamp: Date.now(),
+              city: computedCity,
             };
             addToHistory(entry);
             return;
@@ -113,11 +124,14 @@ function HomeContent() {
         }
         const json: PostcodeData = await res.json();
         setData(json);
+        const computedCity = cityFromPostcodeData(json.location);
+        setCity(computedCity);
         const entry: HistoryEntry = {
           query,
           label: result.label ?? result.code,
           kind: "postcode",
           timestamp: Date.now(),
+          city: computedCity,
         };
         addToHistory(entry);
       }
@@ -156,6 +170,13 @@ function HomeContent() {
           </div>
           <div className="flex items-center gap-3">
             <Link
+              href="/favorites"
+              className="text-sm font-semibold"
+              style={{ color: "#E65100" }}
+            >
+              Favorites
+            </Link>
+            <Link
               href="/history"
               className="text-sm font-semibold"
               style={{ color: "#E65100" }}
@@ -193,11 +214,19 @@ function HomeContent() {
                 — {data.location}
               </p>
             </div>
-            <CompareSetButton
-              query={lastQuery}
-              label={matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code}
-              kind={(areaType as "buurt" | "wijk" | null) ?? "postcode"}
-            />
+            <div className="flex items-center gap-2">
+              <FavoriteButton
+                query={lastQuery}
+                label={matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code}
+                kind={(areaType as "buurt" | "wijk" | null) ?? "postcode"}
+                city={city}
+              />
+              <CompareSetButton
+                query={lastQuery}
+                label={matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code}
+                kind={(areaType as "buurt" | "wijk" | null) ?? "postcode"}
+              />
+            </div>
           </div>
         )}
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
