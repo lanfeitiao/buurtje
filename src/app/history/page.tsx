@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useHistory } from "@/lib/useHistory";
 import { useCompareSet } from "@/lib/useCompareSet";
+import { useFavorites } from "@/lib/useFavorites";
+import type { HistoryEntry, FavoriteEntry } from "@/lib/types";
 import HistoryList from "@/components/HistoryList";
 import CompareSetChip from "@/components/CompareSetChip";
 import { normalizeQuery } from "@/lib/queryNormalize";
@@ -17,6 +19,26 @@ function HistoryContent() {
   const searchParams = useSearchParams();
   const { entries, remove, clear } = useHistory();
   const { add: addCompare } = useCompareSet();
+  const { add: addFav, remove: removeFav, contains: isFav } = useFavorites();
+
+  function handleToggleFavorite(entry: HistoryEntry) {
+    if (isFav(entry.query)) {
+      removeFav(entry.query);
+    } else {
+      const fav: FavoriteEntry = {
+        query: entry.query,
+        label: entry.label,
+        kind: entry.kind,
+        city: entry.city ?? "",
+        addedAt: Date.now(),
+      };
+      addFav(fav);
+    }
+  }
+
+  function handleIsFavorite(entry: HistoryEntry): boolean {
+    return isFav(entry.query);
+  }
 
   // Arriving with `?compare=1` (e.g. from "+ Add another" on /compare)
   // opens the page directly in select mode so the user can tick rows.
@@ -92,6 +114,13 @@ function HistoryContent() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/favorites"
+              className="text-sm font-semibold"
+              style={{ color: "#E65100" }}
+            >
+              Favorites
+            </Link>
             <Link href="/" className="text-sm text-gray-500 hover:text-gray-700">
               ← Back
             </Link>
@@ -143,6 +172,8 @@ function HistoryContent() {
           mode={mode}
           selected={selected}
           onToggle={handleToggleEntry}
+          onToggleFavorite={handleToggleFavorite}
+          isFavorite={handleIsFavorite}
         />
       </div>
 
