@@ -187,48 +187,53 @@ function HomeContent() {
           </div>
         </div>
         <PostcodeSearch onSearch={handleSearch} isLoading={isLoading} />
-        {data && !isLoading && (
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <div>
-              {matchedLabel && (
-                <p className="text-sm text-gray-500">
-                  Matched: {matchedLabel}
-                  {buurtName && (
-                    <>
-                      {" · "}
-                      <span className="font-medium text-gray-700">{buurtName}</span>
-                    </>
-                  )}
-                  {areaType && (
-                    <span className="ml-2 rounded bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-600">
-                      {areaType}
-                    </span>
-                  )}
+        {data && !isLoading && (() => {
+          const buttonLabel =
+            matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code;
+          const buttonKind = (areaType as "buurt" | "wijk" | null) ?? "postcode";
+          return (
+            <div className="mt-3 flex items-start justify-between gap-3">
+              <div>
+                {matchedLabel && (
+                  <p className="text-sm text-gray-500">
+                    Matched: {matchedLabel}
+                    {buurtName && (
+                      <>
+                        {" · "}
+                        <span className="font-medium text-gray-700">{buurtName}</span>
+                      </>
+                    )}
+                    {areaType && (
+                      <span className="ml-2 rounded bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-600">
+                        {areaType}
+                      </span>
+                    )}
+                  </p>
+                )}
+                <p className="text-sm text-gray-600">
+                  Showing results for{" "}
+                  <span className="font-semibold" style={{ color: "#E65100" }}>
+                    {data.code}
+                  </span>{" "}
+                  — {data.location}
                 </p>
-              )}
-              <p className="text-sm text-gray-600">
-                Showing results for{" "}
-                <span className="font-semibold" style={{ color: "#E65100" }}>
-                  {data.code}
-                </span>{" "}
-                — {data.location}
-              </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <FavoriteButton
+                  query={lastQuery}
+                  label={buttonLabel}
+                  kind={buttonKind}
+                  city={city}
+                />
+                <CompareSetButton
+                  query={lastQuery}
+                  label={buttonLabel}
+                  kind={buttonKind}
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <FavoriteButton
-                query={lastQuery}
-                label={matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code}
-                kind={(areaType as "buurt" | "wijk" | null) ?? "postcode"}
-                city={city}
-              />
-              <CompareSetButton
-                query={lastQuery}
-                label={matchedLabel?.replace(/ \(showing postcode .*\)$/, "") ?? data.code}
-                kind={(areaType as "buurt" | "wijk" | null) ?? "postcode"}
-              />
-            </div>
-          </div>
-        )}
+          );
+        })()}
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </div>
 
