@@ -31,4 +31,11 @@ describe("buildAreaSlug", () => {
   test("preserves slug for unprefixed names", () => {
     expect(buildAreaSlug("Heldenbuurt", "Amstelveen")).toBe("heldenbuurt-amstelveen");
   });
+
+  test("translates CBS gemeente names to allecijfers.nl URL form", () => {
+    expect(buildAreaSlug("Wijk 28 Centrum", "'s-Gravenhage")).toBe("centrum-den-haag");
+    expect(buildAreaSlug("Binnenstad", "'s-Hertogenbosch")).toBe("binnenstad-den-bosch");
+    expect(buildAreaSlug("Afferden", "Bergen (L)")).toBe("afferden-bergen-limburg");
+    expect(buildAreaSlug("Schoorl", "Bergen (NH)")).toBe("schoorl-bergen-noord-holland");
+  });
 });
