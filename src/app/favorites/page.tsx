@@ -175,14 +175,16 @@ export default function FavoritesPage() {
               activeCity={activeCity}
               onChange={setActiveCity}
             />
-            <FavoritesList
-              entries={visibleEntries}
-              onSelect={handleSelect}
-              onRemove={remove}
-              mode={mode}
-              selected={selected}
-              onToggle={handleToggleEntry}
-            />
+            {activeCity && (
+              <FavoritesList
+                entries={visibleEntries}
+                onSelect={handleSelect}
+                onRemove={remove}
+                mode={mode}
+                selected={selected}
+                onToggle={handleToggleEntry}
+              />
+            )}
           </>
         )}
       </div>
