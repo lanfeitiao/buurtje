@@ -123,4 +123,29 @@ describe("history", () => {
     // restore for any later tests in this file
     installLocalStorage();
   });
+
+  test("addToHistory round-trips the optional city field", () => {
+    addToHistory({
+      query: "De Pijp",
+      label: "De Pijp, Amsterdam",
+      kind: "buurt",
+      timestamp: 1000,
+      city: "Amsterdam",
+    });
+    const entries = readHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].city).toBe("Amsterdam");
+  });
+
+  test("addToHistory accepts entries without a city (legacy)", () => {
+    addToHistory({
+      query: "De Pijp",
+      label: "De Pijp, Amsterdam",
+      kind: "buurt",
+      timestamp: 1000,
+    });
+    const entries = readHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].city).toBeUndefined();
+  });
 });

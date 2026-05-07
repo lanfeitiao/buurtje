@@ -48,6 +48,15 @@ export type HistoryEntry = {
   label: string;
   kind: "postcode" | "buurt" | "wijk";
   timestamp: number;
+  city?: string; // gemeente; absent on legacy entries written before this feature
+};
+
+export type FavoriteEntry = {
+  query: string;
+  label: string;
+  kind: "postcode" | "buurt" | "wijk";
+  city: string; // gemeente; "" means unknown (rendered as "Other")
+  addedAt: number;
 };
 
 export type CompareEntry = {

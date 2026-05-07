@@ -1,45 +1,36 @@
 "use client";
 
-import Link from "next/link";
-import type { HistoryEntry } from "@/lib/types";
+import type { FavoriteEntry } from "@/lib/types";
 import { normalizeQuery } from "@/lib/queryNormalize";
 
-interface HistoryListProps {
-  entries: HistoryEntry[];
+interface FavoritesListProps {
+  entries: FavoriteEntry[];
   onSelect: (query: string) => void;
   onRemove: (query: string) => void;
   mode?: "navigate" | "select";
   selected?: Set<string>;
   onToggle?: (query: string) => void;
-  onToggleFavorite?: (entry: HistoryEntry) => void;
-  isFavorite?: (entry: HistoryEntry) => boolean;
 }
 
-function badgeClasses(kind: HistoryEntry["kind"]): string {
+function badgeClasses(kind: FavoriteEntry["kind"]): string {
   if (kind === "postcode") return "bg-gray-100 text-gray-600";
   return "bg-orange-50 text-orange-600";
 }
 
-export default function HistoryList({
+export default function FavoritesList({
   entries,
   onSelect,
   onRemove,
   mode = "navigate",
   selected,
   onToggle,
-  onToggleFavorite,
-  isFavorite,
-}: HistoryListProps) {
+}: FavoritesListProps) {
   if (entries.length === 0) {
     return (
       <div className="px-5 py-12 text-center">
-        <p className="text-sm font-medium text-gray-700">No searches yet</p>
+        <p className="text-sm font-medium text-gray-700">No favorites in this city</p>
         <p className="mt-1 text-xs text-gray-400">
-          Try searching from the{" "}
-          <Link href="/" className="font-semibold" style={{ color: "#E65100" }}>
-            home page
-          </Link>{" "}
-          to start your history.
+          Tap the heart on a search result to start saving.
         </p>
       </div>
     );
@@ -94,35 +85,18 @@ export default function HistoryList({
                 {entry.kind}
               </span>
             </div>
-            <div className="flex items-center">
-              {onToggleFavorite && isFavorite && (
-                <button
-                  type="button"
-                  aria-label={
-                    isFavorite(entry) ? `Unfavorite ${entry.label}` : `Favorite ${entry.label}`
-                  }
-                  className="rounded px-2 py-1 text-base hover:bg-orange-50"
-                  style={{ color: isFavorite(entry) ? "#E65100" : "#9CA3AF" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(entry);
-                  }}
-                >
-                  {isFavorite(entry) ? "♥" : "♡"}
-                </button>
-              )}
-              <button
-                type="button"
-                aria-label={`Remove ${entry.label}`}
-                className="rounded px-2 py-1 text-base text-gray-400 hover:bg-red-50 hover:text-red-700"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove(entry.query);
-                }}
-              >
-                ✕
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label={`Unfavorite ${entry.label}`}
+              className="rounded px-2 py-1 text-base hover:bg-orange-100"
+              style={{ color: "#E65100" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(entry.query);
+              }}
+            >
+              ♥
+            </button>
           </li>
         );
       })}

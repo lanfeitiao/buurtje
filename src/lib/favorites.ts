@@ -1,7 +1,7 @@
-import type { HistoryEntry } from "@/lib/types";
+import type { FavoriteEntry } from "@/lib/types";
 import { normalizeQuery } from "@/lib/queryNormalize";
 
-const KEY = "buurtje:search-history";
+const KEY = "buurtje:favorites";
 const MAX_ENTRIES = 50;
 
 function hasStorage(): boolean {
@@ -12,42 +12,46 @@ function hasStorage(): boolean {
   }
 }
 
-function isHistoryEntry(value: unknown): value is HistoryEntry {
+function isFavoriteEntry(value: unknown): value is FavoriteEntry {
   if (!value || typeof value !== "object") return false;
   const e = value as Record<string, unknown>;
   return (
     typeof e.query === "string" &&
     typeof e.label === "string" &&
     (e.kind === "postcode" || e.kind === "buurt" || e.kind === "wijk") &&
-    typeof e.timestamp === "number" &&
-    (e.city === undefined || typeof e.city === "string")
+    typeof e.city === "string" &&
+    typeof e.addedAt === "number"
   );
 }
 
-export function readHistory(): HistoryEntry[] {
+export function readFavorites(): FavoriteEntry[] {
   if (!hasStorage()) return [];
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isHistoryEntry);
+    return parsed.filter(isFavoriteEntry);
   } catch {
     return [];
   }
 }
 
-export function addToHistory(entry: HistoryEntry): void {
+export function addFavorite(entry: FavoriteEntry): void {
   if (!hasStorage()) return;
   try {
     const norm = normalizeQuery(entry.query);
-    const current = readHistory().filter((e) => normalizeQuery(e.query) !== norm);
-    const merged = [entry, ...current];
+    const current = readFavorites();
+    if (current.some((e) => normalizeQuery(e.query) === norm)) {
+      return;
+    }
+    const merged = [...current, entry];
 
     let next = merged;
     if (next.length > MAX_ENTRIES) {
-      // Drop the entries with the lowest timestamps until we're at the cap.
-      next = [...merged].sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_ENTRIES);
+      next = [...merged]
+        .sort((a, b) => a.addedAt - b.addedAt)
+        .slice(merged.length - MAX_ENTRIES);
     }
 
     localStorage.setItem(KEY, JSON.stringify(next));
@@ -57,11 +61,11 @@ export function addToHistory(entry: HistoryEntry): void {
   }
 }
 
-export function removeFromHistory(query: string): void {
+export function removeFavorite(query: string): void {
   if (!hasStorage()) return;
   try {
     const norm = normalizeQuery(query);
-    const next = readHistory().filter((e) => normalizeQuery(e.query) !== norm);
+    const next = readFavorites().filter((e) => normalizeQuery(e.query) !== norm);
     localStorage.setItem(KEY, JSON.stringify(next));
     notifyChange();
   } catch {
@@ -69,7 +73,7 @@ export function removeFromHistory(query: string): void {
   }
 }
 
-export function clearHistory(): void {
+export function clearFavorites(): void {
   if (!hasStorage()) return;
   try {
     localStorage.removeItem(KEY);
@@ -79,10 +83,15 @@ export function clearHistory(): void {
   }
 }
 
+export function isFavorited(query: string): boolean {
+  const norm = normalizeQuery(query);
+  return readFavorites().some((e) => normalizeQuery(e.query) === norm);
+}
+
 function notifyChange(): void {
   if (typeof window === "undefined") return;
   try {
-    window.dispatchEvent(new CustomEvent("buurtje:history-changed"));
+    window.dispatchEvent(new CustomEvent("buurtje:favorites-changed"));
   } catch {
     // silent
   }

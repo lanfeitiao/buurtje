@@ -1,61 +1,74 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { useHistory } from "@/lib/useHistory";
-import { useCompareSet } from "@/lib/useCompareSet";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useFavorites } from "@/lib/useFavorites";
-import type { HistoryEntry, FavoriteEntry } from "@/lib/types";
-import HistoryList from "@/components/HistoryList";
+import { useCompareSet } from "@/lib/useCompareSet";
+import CityTabs from "@/components/CityTabs";
+import FavoritesList from "@/components/FavoritesList";
 import CompareSetChip from "@/components/CompareSetChip";
 import { normalizeQuery } from "@/lib/queryNormalize";
+import type { FavoriteEntry } from "@/lib/types";
 
 const MAX_ENTRIES = 50;
 const COMPARE_CAP = 4;
+const OTHER_CITY = "Other";
 
-function HistoryContent() {
+function groupByCity(entries: FavoriteEntry[]): Map<string, FavoriteEntry[]> {
+  const map = new Map<string, FavoriteEntry[]>();
+  for (const e of entries) {
+    const key = e.city.trim() === "" ? OTHER_CITY : e.city;
+    const arr = map.get(key) ?? [];
+    arr.push(e);
+    map.set(key, arr);
+  }
+  return map;
+}
+
+function sortedCityNames(map: Map<string, FavoriteEntry[]>): string[] {
+  // Alphabetical, "Other" pinned last.
+  const names = Array.from(map.keys());
+  names.sort((a, b) => {
+    if (a === OTHER_CITY) return 1;
+    if (b === OTHER_CITY) return -1;
+    return a.localeCompare(b, undefined, { sensitivity: "base" });
+  });
+  return names;
+}
+
+export default function FavoritesPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { entries, remove, clear } = useHistory();
+  const { entries, remove } = useFavorites();
   const { add: addCompare } = useCompareSet();
-  const { add: addFav, remove: removeFav, contains: isFav } = useFavorites();
 
-  function handleToggleFavorite(entry: HistoryEntry) {
-    if (isFav(entry.query)) {
-      removeFav(entry.query);
-    } else {
-      const fav: FavoriteEntry = {
-        query: entry.query,
-        label: entry.label,
-        kind: entry.kind,
-        city: entry.city ?? "",
-        addedAt: Date.now(),
-      };
-      addFav(fav);
-    }
-  }
+  const groups = useMemo(() => groupByCity(entries), [entries]);
+  const cityNames = useMemo(() => sortedCityNames(groups), [groups]);
 
-  function handleIsFavorite(entry: HistoryEntry): boolean {
-    return isFav(entry.query);
-  }
-
-  // Arriving with `?compare=1` (e.g. from "+ Add another" on /compare)
-  // opens the page directly in select mode so the user can tick rows.
-  const [mode, setMode] = useState<"navigate" | "select">(
-    searchParams.get("compare") === "1" ? "select" : "navigate"
-  );
+  const [activeCity, setActiveCity] = useState<string>("");
+  const [mode, setMode] = useState<"navigate" | "select">("navigate");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Pick / re-pick the active tab when the data changes.
+  useEffect(() => {
+    if (cityNames.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (activeCity !== "") setActiveCity("");
+      return;
+    }
+    if (!cityNames.includes(activeCity)) {
+      setActiveCity(cityNames[0]);
+    }
+  }, [cityNames, activeCity]);
+
+  const tabsForStrip = cityNames.map((name) => ({
+    name,
+    count: groups.get(name)?.length ?? 0,
+  }));
+  const visibleEntries = activeCity ? groups.get(activeCity) ?? [] : [];
 
   function handleSelect(query: string) {
     router.push(`/?q=${encodeURIComponent(query)}`);
-  }
-
-  function handleClearAll() {
-    if (entries.length === 0) return;
-    if (window.confirm("Clear all search history?")) {
-      clear();
-    }
   }
 
   function handleToggleMode() {
@@ -81,22 +94,16 @@ function HistoryContent() {
   }
 
   function handleCompareSelected() {
-    // Append the selected entries onto the existing compare set rather than
-    // replacing it. The data layer's dedupe-as-no-op handles re-adds; the
-    // cap=4 with FIFO eviction handles overflow. Iterate entries (history
-    // order) — selected.has uses normalized keys so case/whitespace match.
     const chosen = entries.filter((e) => selected.has(normalizeQuery(e.query)));
     if (chosen.length < 1) return;
-
     chosen.forEach((entry, i) => {
       addCompare({
         query: entry.query,
         label: entry.label,
         kind: entry.kind,
-        addedAt: Date.now() + i, // unique addedAt per entry to preserve order
+        addedAt: Date.now() + i,
       });
     });
-
     router.push("/compare");
   }
 
@@ -115,11 +122,11 @@ function HistoryContent() {
           </div>
           <div className="flex items-center gap-3">
             <Link
-              href="/favorites"
+              href="/history"
               className="text-sm font-semibold"
               style={{ color: "#E65100" }}
             >
-              Favorites
+              History
             </Link>
             <Link href="/" className="text-sm text-gray-500 hover:text-gray-700">
               ← Back
@@ -140,11 +147,9 @@ function HistoryContent() {
           </div>
         </div>
 
-        <div className="flex items-end justify-between px-5 pb-3 pt-5">
+        <div className="flex items-end justify-between px-5 pb-1 pt-5">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">
-              Search history
-            </h1>
+            <h1 className="text-lg font-semibold text-gray-900">Favorites</h1>
             <p className="mt-0.5 text-xs text-gray-500">
               {entries.length} of {MAX_ENTRIES} saved
               {mode === "select" && selected.size > 0 && (
@@ -154,27 +159,34 @@ function HistoryContent() {
               )}
             </p>
           </div>
-          {entries.length > 0 && mode === "navigate" && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
-            >
-              Clear all
-            </button>
-          )}
         </div>
 
-        <HistoryList
-          entries={entries}
-          onSelect={handleSelect}
-          onRemove={remove}
-          mode={mode}
-          selected={selected}
-          onToggle={handleToggleEntry}
-          onToggleFavorite={handleToggleFavorite}
-          isFavorite={handleIsFavorite}
-        />
+        {entries.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <p className="text-sm font-medium text-gray-700">No favorites yet</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Tap the heart on a search result to start saving.
+            </p>
+          </div>
+        ) : (
+          <>
+            <CityTabs
+              cities={tabsForStrip}
+              activeCity={activeCity}
+              onChange={setActiveCity}
+            />
+            {activeCity && (
+              <FavoritesList
+                entries={visibleEntries}
+                onSelect={handleSelect}
+                onRemove={remove}
+                mode={mode}
+                selected={selected}
+                onToggle={handleToggleEntry}
+              />
+            )}
+          </>
+        )}
       </div>
 
       {mode === "select" && selected.size >= 1 && (
@@ -190,13 +202,5 @@ function HistoryContent() {
         </div>
       )}
     </main>
-  );
-}
-
-export default function HistoryPage() {
-  return (
-    <Suspense fallback={null}>
-      <HistoryContent />
-    </Suspense>
   );
 }
